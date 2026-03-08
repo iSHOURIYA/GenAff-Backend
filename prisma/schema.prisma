@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  user
+  admin
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+}
+
+enum ProviderName {
+  openai
+  deepseek
+  gemini
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id                   String   @id @default(uuid())
+  email                String   @unique
+  password_hash        String
+  role                 UserRole @default(user)
+  free_units_remaining Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  apiKeys      ApiKey[]
+  wallet       Wallet?
+  topUps       TopUpTransaction[]
+  usageRecords Usage[]
+
+  @@map("users")
+}
+
+model ApiKey {
+  id                String   @id @default(uuid())
+  key_hash          String   @unique
+  plain_key_preview String   // last 6 chars only
+  name              String
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  usageRecords Usage[]
+
+  @@map("api_keys")
+}
+
+model Wallet {
+  id               String   @id @default(uuid())
+  balance_inr_cents Int     @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+model TopUpTransaction {
+  id               String            @id @default(uuid())
+  amount_inr_cents Int
+  provider         String            // e.g. "razorpay" | "manual"
+  provider_tx_id   String?
+  status           TransactionStatus @default(pending)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("top_up_transactions")
+}
+
+model Usage {
+  id               String       @id @default(uuid())
+  provider         ProviderName
+  model            String
+  request_payload  Json
+  response_payload Json?
+  tokens_used      Int          @default(0)
+  cost_inr_cents   Int          @default(0)
+  status           String       @default("completed") // pending | reserved | completed | failed
+  createdAt        DateTime     @default(now())
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKeyId String
+  apiKey   ApiKey @relation(fields: [apiKeyId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([apiKeyId])
+  @@map("usage_records")
+}
+
+model ProviderConfig {
+  id                      String       @id @default(uuid())
+  provider                ProviderName @unique
+  enabled                 Boolean      @default(true)
+  pricing_per_token_usd   Decimal      @db.Decimal(20, 10)
+  base_request_cost_usd   Decimal      @db.Decimal(20, 10)
+  priority                Int          @default(0) // lower = higher priority
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  @@map("provider_configs")
+}
+
+model ModelMapping {
+  id                    String       @id @default(uuid())
+  provider              ProviderName
+  provider_model_name   String
+  display_name          String
+  active                Boolean      @default(true)
+  pricing_override_usd  Decimal?     @db.Decimal(20, 10)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@unique([provider, provider_model_name])
+  @@map("model_mappings")
+}
