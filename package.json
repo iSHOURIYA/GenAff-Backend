@@ -15,7 +15,11 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
-    "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix"
+    "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
+    "docs:serve": "npx @redocly/cli preview-docs docs/openapi.yaml --port 8080",
+    "docs:lint": "npx @redocly/cli lint docs/openapi.yaml",
+    "docs:bundle": "npx @redocly/cli bundle docs/openapi.yaml -o docs/openapi.bundled.yaml",
+    "docs:gen-types": "npx openapi-typescript docs/openapi.yaml -o src/types/api.d.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

@@ -144,7 +144,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(keysRoutes);
   await app.register(walletRoutes);
   await app.register(proxyRoutes);
-  await app.register(adminRoutes, { prefix: "/admin" });
+  await app.register(adminRoutes);
   await app.register(webhookRoutes);
 
   // Health check
