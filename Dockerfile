@@ -3,8 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for argon2/native modules
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for argon2/native modules + OpenSSL 3.x for Prisma
+RUN apk add --no-cache python3 make g++ openssl
 
 COPY package*.json ./
 RUN npm ci --include=dev
@@ -24,6 +24,9 @@ RUN npm prune --production
 FROM node:20-alpine AS production
 
 WORKDIR /app
+
+# OpenSSL 3.x required by Prisma query engine (linux-musl-openssl-3.0.x)
+RUN apk add --no-cache openssl
 
 # Security: run as non-root
 RUN addgroup -g 1001 -S nodejs && \
