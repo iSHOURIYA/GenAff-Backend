@@ -14,8 +14,8 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript (app + seed)
+RUN npm run build && npx tsc -p tsconfig.seed.json
 
 # Prune dev dependencies
 RUN npm prune --production

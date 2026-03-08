@@ -61,7 +61,7 @@ services:
     command: >
       sh -c "
         node node_modules/.bin/prisma migrate deploy &&
-        node node_modules/.bin/ts-node prisma/seed.ts || true &&
+        node dist/prisma/seed.js || true &&
         node dist/index.js
       "
     healthcheck:
