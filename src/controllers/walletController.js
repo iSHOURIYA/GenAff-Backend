@@ -2,6 +2,7 @@ const {
   getWallet,
   createTopUpOrder,
   verifyAndCreditWallet,
+  cancelTopUpOrder,
   getTopUpHistory,
 } = require('../services/walletService');
 const { getUsageHistory, getUsageStats } = require('../services/usageService');
@@ -105,6 +106,25 @@ async function verifyPayment(req, res) {
 }
 
 /**
+ * POST /wallet/topup/cancel
+ * Cancel a pending Razorpay order (before payment is made).
+ * Body: { topup_id }
+ */
+async function cancelOrder(req, res) {
+  try {
+    const { topup_id } = req.body;
+    if (!topup_id) return res.status(400).json({ error: 'topup_id is required' });
+
+    const topUp = await cancelTopUpOrder(req.user.id, topup_id);
+    return res.status(200).json({ message: 'Top-up order cancelled', topUp });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[walletController.cancelOrder]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
  * GET /wallet/history
  * Return top-up transaction history.
  */
@@ -149,4 +169,4 @@ async function usageStats(req, res) {
   }
 }
 
-module.exports = { walletBalance, createOrder, verifyPayment, topUpHistory, usageHistory, usageStats };
+module.exports = { walletBalance, createOrder, verifyPayment, cancelOrder, topUpHistory, usageHistory, usageStats };

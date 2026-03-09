@@ -137,20 +137,57 @@ All endpoints require `Authorization: Bearer <JWT>`.
 
 All endpoints require `Authorization: Bearer <JWT>`.
 
-| Method | Endpoint           | Description                        |
-|--------|--------------------|------------------------------------|
-| `GET`  | `/wallet`          | Current balance                    |
-| `POST` | `/wallet/topup`    | Add money (simulated, min ₹10)     |
-| `GET`  | `/wallet/history`  | Top-up transactions                |
-| `GET`  | `/wallet/usage`    | AI usage records (paginated)       |
-| `GET`  | `/wallet/stats`    | Total tokens & spend               |
+| Method | Endpoint                  | Description                             |
+|--------|---------------------------|-----------------------------------------|
+| `GET`  | `/wallet`                 | Current balance                         |
+| `POST` | `/wallet/topup/order`     | Create Razorpay order (Step 1)          |
+| `POST` | `/wallet/topup/verify`    | Verify payment & credit wallet (Step 2) |
+| `GET`  | `/wallet/history`         | Top-up transactions                     |
+| `GET`  | `/wallet/usage`           | AI usage records (paginated)            |
+| `GET`  | `/wallet/stats`           | Total tokens & spend                    |
 
-**Top-up request:**
+**Razorpay Top-up Flow:**
 
+**Step 1 – Create order** (`POST /wallet/topup/order`):
 ```json
-// POST /wallet/topup
+// Request
 { "amount": 100 }
+
+// Response
+{
+  "order_id": "order_XXXXXXXXXXXXXXXX",
+  "amount": 10000,
+  "currency": "INR",
+  "key_id": "rzp_live_...",
+  "topup_id": "<internal-uuid>"
+}
 ```
+
+**Step 2 – Open Razorpay checkout on frontend** using `order_id` and `key_id`.
+
+Razorpay calls your frontend `handler` with:
+```js
+{ razorpay_order_id, razorpay_payment_id, razorpay_signature }
+```
+
+**Step 3 – Verify & credit** (`POST /wallet/topup/verify`):
+```json
+// Request
+{
+  "razorpay_order_id": "order_XXXXXXXXXXXXXXXX",
+  "razorpay_payment_id": "pay_XXXXXXXXXXXXXXXX",
+  "razorpay_signature": "<hmac-sha256-hex>"
+}
+
+// Response 200
+{
+  "message": "₹100 added to your wallet successfully",
+  "topUp": { ... },
+  "new_balance_inr": 100.0
+}
+```
+
+The backend verifies the HMAC-SHA256 signature using `RAZORPAY_KEY_SECRET` before crediting. No money is ever added without a valid signature.
 
 ---
 
@@ -412,19 +449,21 @@ Your API is now live at `https://genaff-api.shauryacodes.xyz`.
 
 ## Environment Variables
 
-| Variable         | Required | Description                                  |
-|------------------|----------|----------------------------------------------|
-| `DATABASE_URL`   | ✅       | PostgreSQL connection string                 |
-| `JWT_SECRET`     | ✅       | Secret for signing JWT tokens                |
-| `JWT_EXPIRES_IN` | –        | Token expiry (default: `7d`)                 |
-| `PORT`           | –        | Server port (default: `3000`)                |
-| `NODE_ENV`       | –        | `development` or `production`                |
-| `OPENAI_API_KEY` | ✅*      | Your OpenAI API key                          |
-| `DEEPSEEK_API_KEY`| ✅*     | Your DeepSeek API key                        |
-| `GEMINI_API_KEY` | ✅*      | Your Google Gemini API key                   |
-| `FRONTEND_URL`   | –        | CORS-allowed frontend origin                 |
-| `RATE_LIMIT_RPM` | –        | Requests per minute per key (default: `20`)  |
-| `MIN_TOPUP_INR`  | –        | Minimum top-up amount (default: `10`)        |
+| Variable           | Required | Description                                  |
+|--------------------|----------|----------------------------------------------|
+| `DATABASE_URL`     | ✅       | PostgreSQL connection string                 |
+| `JWT_SECRET`       | ✅       | Secret for signing JWT tokens                |
+| `JWT_EXPIRES_IN`   | –        | Token expiry (default: `7d`)                 |
+| `PORT`             | –        | Server port (default: `3000`)                |
+| `NODE_ENV`         | –        | `development` or `production`                |
+| `RAZORPAY_KEY_ID`  | ✅       | Razorpay Key ID (`rzp_live_...`)             |
+| `RAZORPAY_KEY_SECRET`| ✅     | Razorpay Key Secret                          |
+| `OPENAI_API_KEY`   | ✅*      | Your OpenAI API key                          |
+| `DEEPSEEK_API_KEY` | ✅*       | Your DeepSeek API key                        |
+| `GEMINI_API_KEY`   | ✅*       | Your Google Gemini API key                   |
+| `FRONTEND_URL`     | –        | CORS-allowed frontend origin                 |
+| `RATE_LIMIT_RPM`   | –        | Requests per minute per key (default: `20`)  |
+| `MIN_TOPUP_INR`    | –        | Minimum top-up amount (default: `10`)        |
 
 *At least one AI provider key is required.
 

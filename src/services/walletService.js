@@ -180,10 +180,35 @@ async function getTopUpHistory(userId, limit = 20) {
   });
 }
 
+/**
+ * Cancel a pending top-up order.
+ * Only the owner can cancel their own pending order.
+ * @param {string} userId
+ * @param {string} topUpId
+ * @returns {Promise<object>} updated TopUp record
+ */
+async function cancelTopUpOrder(userId, topUpId) {
+  const topUp = await prisma.topUp.findFirst({
+    where: { id: topUpId, user_id: userId, status: 'pending' },
+  });
+
+  if (!topUp) {
+    const err = new Error('No pending top-up order found with that id');
+    err.status = 404;
+    throw err;
+  }
+
+  return prisma.topUp.update({
+    where: { id: topUpId },
+    data: { status: 'cancelled' },
+  });
+}
+
 module.exports = {
   getWallet,
   createTopUpOrder,
   verifyAndCreditWallet,
+  cancelTopUpOrder,
   deductBalance,
   getTopUpHistory,
 };

@@ -3,6 +3,7 @@ const {
   walletBalance,
   createOrder,
   verifyPayment,
+  cancelOrder,
   topUpHistory,
   usageHistory,
   usageStats,
@@ -20,6 +21,9 @@ router.post('/topup/order', createOrder);
 
 // POST /wallet/topup/verify     – verify signature & credit wallet (Step 2)
 router.post('/topup/verify', verifyPayment);
+
+// POST /wallet/topup/cancel     – cancel a pending order
+router.post('/topup/cancel', cancelOrder);
 
 // GET  /wallet/history          – top-up transaction history
 router.get('/history', topUpHistory);
