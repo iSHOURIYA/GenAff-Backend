@@ -11,18 +11,34 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password_hash String
-  created_at    DateTime @default(now())
-  free_units    Int      @default(10)
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password_hash  String
+  created_at     DateTime @default(now())
+  free_units     Int      @default(10)
+  email_verified Boolean  @default(false)
 
-  api_keys ApiKey[]
-  wallet   Wallet?
-  usages   Usage[]
-  top_ups  TopUp[]
+  api_keys              ApiKey[]
+  wallet                Wallet?
+  usages                Usage[]
+  top_ups               TopUp[]
+  pending_verifications PendingVerification[]
 
   @@map("users")
+}
+
+model PendingVerification {
+  id         String   @id @default(uuid())
+  user_id    String
+  otp        String   // 6-digit code
+  token      String   @unique // uuid for magic link
+  expires_at DateTime
+  used       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("pending_verifications")
 }
 
 model ApiKey {

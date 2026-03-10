@@ -46,4 +46,16 @@ const authRateLimiter = rateLimit({
   message: { error: 'Too many login attempts, please try again later.' },
 });
 
-module.exports = { proxyRateLimiter, authRateLimiter };
+/**
+ * Resend verification limiter – prevents email flooding.
+ * 3 resend attempts per 10 minutes per IP.
+ */
+const resendRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many resend attempts. Please wait 10 minutes before trying again.' },
+});
+
+module.exports = { proxyRateLimiter, authRateLimiter, resendRateLimiter };

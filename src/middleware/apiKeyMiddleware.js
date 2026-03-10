@@ -40,6 +40,13 @@ async function apiKeyMiddleware(req, res, next) {
       return res.status(403).json({ error: 'API key is disabled' });
     }
 
+    if (!apiKey.user.email_verified) {
+      return res.status(403).json({
+        error: 'Email not verified',
+        message: 'Please verify your email address before using the API. Check your inbox or request a new code at POST /auth/resend-verification',
+      });
+    }
+
     req.apiKey = apiKey;
     req.apiKeyUser = apiKey.user;
     next();

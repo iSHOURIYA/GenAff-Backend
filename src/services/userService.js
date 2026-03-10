@@ -81,4 +81,23 @@ async function getUserById(id) {
   });
 }
 
-module.exports = { createUser, authenticateUser, getUserById };
+/**
+ * Fetch a user by email (no password_hash).
+ * Used for resend-verification — returns null if not found.
+ * @param {string} email
+ * @returns {Promise<object|null>}
+ */
+async function getUserByEmail(email) {
+  return prisma.user.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      email: true,
+      created_at: true,
+      free_units: true,
+      email_verified: true,
+    },
+  });
+}
+
+module.exports = { createUser, authenticateUser, getUserById, getUserByEmail };
