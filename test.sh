@@ -4,7 +4,7 @@
 # Usage: bash test.sh
 # ─────────────────────────────────────────────────────────────────
 
-BASE="http://localhost:3000"
+BASE="https://genaff-api.shauryacodes.xyz"
 PASS=0
 FAIL=0
 

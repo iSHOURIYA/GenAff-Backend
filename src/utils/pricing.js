@@ -47,15 +47,6 @@ const MODEL_PRICING = {
   'deepseek-v3.1-maas':     0.0014,
 
   // ── Gemini (March 2026) ────────────────────────────────────────────────
-  // 1.5 series – deprecated Feb 2025, kept for billing fallback only
-  'gemini-1.5-flash':       0.000075,
-  'gemini-1.5-flash-8b':    0.0000375,
-  'gemini-1.5-pro':         0.00175,
-  // 2.0 series – stable recommended
-  'gemini-2.0-flash':       0.0001,
-  'gemini-2.0-flash-exp':   0.0001,   // experimental channel of 2.0 flash
-  'gemini-2.0-flash-lite':  0.000075,
-  'gemini-2.0-pro-exp':     0.00175,  // experimental pro
   // 2.5 series – latest
   'gemini-2.5-flash':       0.0001,
   'gemini-2.5-flash-exp':   0.0001,
