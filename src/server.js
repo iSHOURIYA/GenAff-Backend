@@ -9,6 +9,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 // ── Routes ────────────────────────────────────────────────────────────
 const authRoutes   = require('./routes/auth');
@@ -21,6 +22,14 @@ const app = express();
 
 // Trust proxy headers (needed when behind nginx on VPS)
 app.set('trust proxy', 1);
+
+// ── Security Headers (helmet) ─────────────────────────────────────────
+app.use(helmet({
+  // API-only server — disable browser-only protections that would
+  // add noise to JSON responses or break CORS preflight.
+  contentSecurityPolicy: false,   // no HTML served
+  crossOriginEmbedderPolicy: false,
+}));
 
 // ── CORS ──────────────────────────────────────────────────────────────
 const allowedOrigins = [

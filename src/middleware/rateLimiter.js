@@ -58,4 +58,18 @@ const resendRateLimiter = rateLimit({
   message: { error: 'Too many resend attempts. Please wait 10 minutes before trying again.' },
 });
 
-module.exports = { proxyRateLimiter, authRateLimiter, resendRateLimiter };
+/**
+ * OTP verification limiter – prevents brute-force of 6-digit codes.
+ * 5 attempts per 15 minutes per IP. A 6-digit code has 1,000,000
+ * combinations; at 5 attempts/15 min an attacker needs ~2 million
+ * minutes (~4 years) on average to guess one code.
+ */
+const otpRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification attempts. Please wait 15 minutes or request a new code.' },
+});
+
+module.exports = { proxyRateLimiter, authRateLimiter, resendRateLimiter, otpRateLimiter };

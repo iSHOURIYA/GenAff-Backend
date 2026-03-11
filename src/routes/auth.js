@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const { register, login, me, verifyOtp, verifyEmail, resendVerification } = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
-const { authRateLimiter, resendRateLimiter } = require('../middleware/rateLimiter');
+const { authRateLimiter, resendRateLimiter, otpRateLimiter } = require('../middleware/rateLimiter');
 
 // POST /auth/register
 router.post('/register', register);
@@ -12,8 +12,8 @@ router.post('/login', authRateLimiter, login);
 // GET /auth/me  (requires JWT)
 router.get('/me', authMiddleware, me);
 
-// POST /auth/verify-otp  (cross-device: user types the 6-digit code)
-router.post('/verify-otp', verifyOtp);
+// POST /auth/verify-otp  (cross-device: user types the 6-digit code — rate limited)
+router.post('/verify-otp', otpRateLimiter, verifyOtp);
 
 // GET /auth/verify-email?token=<uuid>  (same-device: magic link click)
 router.get('/verify-email', verifyEmail);

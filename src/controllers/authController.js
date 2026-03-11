@@ -28,6 +28,10 @@ async function register(req, res) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
+    if (password.length > 72) {
+      return res.status(400).json({ error: 'Password must be 72 characters or fewer' });
+    }
+
     const user = await createUser(email.toLowerCase().trim(), password);
 
     // Send hybrid OTP + magic-link verification email
