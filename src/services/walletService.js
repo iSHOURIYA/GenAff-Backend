@@ -138,24 +138,35 @@ async function verifyAndCreditWallet(userId, razorpay_order_id, razorpay_payment
 }
 
 /**
- * Deduct an amount from the user's wallet.
- * Called after a successful AI request.
+ * Atomically deduct an amount from the user's wallet.
+ * Uses a single SQL UPDATE with a WHERE balance >= cost guard to
+ * eliminate the read-modify-write race condition and prevent overdraft.
+ *
  * @param {string} userId
  * @param {number} costInr
- * @returns {Promise<Decimal>} updated balance
+ * @returns {Promise<void>}
+ * @throws {Error} status 402 if balance is insufficient at deduction time
+ * @throws {Error} if wallet not found
  */
 async function deductBalance(userId, costInr) {
-  const wallet = await prisma.wallet.findUnique({ where: { user_id: userId } });
-  if (!wallet) throw new Error('Wallet not found');
+  // Single atomic statement: only deducts if balance is sufficient at that instant.
+  // GREATEST(..., 0) is a safety net; the WHERE clause is the real guard.
+  const rowsAffected = await prisma.$executeRaw`
+    UPDATE wallets
+    SET    balance_inr = GREATEST(balance_inr - ${costInr}::numeric, 0),
+           updated_at  = NOW()
+    WHERE  user_id     = ${userId}
+    AND    balance_inr >= ${costInr}::numeric
+  `;
 
-  const newBalance = parseFloat(wallet.balance_inr) - costInr;
-
-  const updated = await prisma.wallet.update({
-    where: { user_id: userId },
-    data: { balance_inr: Math.max(0, newBalance) },
-  });
-
-  return updated.balance_inr;
+  if (rowsAffected === 0) {
+    // Either wallet doesn't exist or balance was insufficient at deduction time
+    const wallet = await prisma.wallet.findUnique({ where: { user_id: userId } });
+    if (!wallet) throw new Error('Wallet not found');
+    const err = new Error('Insufficient balance');
+    err.status = 402;
+    throw err;
+  }
 }
 
 /**

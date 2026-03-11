@@ -4,6 +4,7 @@ const { callGemini } = require('../providers/gemini');
 const { calculateCostInr, detectProvider } = require('../utils/pricing');
 const { deductBalance } = require('../services/walletService');
 const { logUsage } = require('../services/usageService');
+const prisma = require('../services/prismaClient');
 
 const PROVIDER_HANDLERS = {
   openai: callOpenAI,
@@ -96,22 +97,36 @@ async function chatCompletions(req, res) {
     // ── Deduct balance ────────────────────────────────────────────
     if (costInr > 0) {
       if (walletBalance >= costInr) {
-        // Deduct from wallet
+        // Wallet has enough — attempt atomic deduction.
+        // deductBalance uses a single SQL UPDATE with a WHERE balance >= cost
+        // guard so concurrent requests cannot overdraw.
         try {
           await deductBalance(user.id, costInr);
         } catch (deductErr) {
-          console.error('[proxyController] Failed to deduct balance:', deductErr.message);
-          // Non-fatal: still return the response; log the issue
+          // 402 means a concurrent request drained the wallet between our
+          // pre-check above and the actual deduction. Fall back to a free
+          // unit if any remain; otherwise just log — the response is already
+          // sent so we can't charge the user retroactively.
+          if (deductErr.status === 402 && freeUnits > 0) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { free_units: { decrement: 1 } },
+            }).catch(() => {});
+          } else {
+            console.error('[proxyController] Failed to deduct balance:', deductErr.message);
+          }
         }
-      } else if (freeUnits > 0) {
-        // Use a free unit
-        const prisma = require('../services/prismaClient');
+      } else if (walletBalance <= 0 && freeUnits > 0) {
+        // Wallet is empty — consume one free unit.
+        // (walletBalance > 0 but < costInr is an edge case where the user
+        // has some balance but not enough for this request; we do not burn
+        // a free unit in that case — the pre-check already blocked users
+        // with walletBalance <= 0 AND freeUnits <= 0.)
         await prisma.user.update({
           where: { id: user.id },
           data: { free_units: { decrement: 1 } },
         }).catch(() => {});
       }
-      // If balance is 0 but cost is negligible (< 0.000001) still allow
     }
 
     // ── Log usage ─────────────────────────────────────────────────
