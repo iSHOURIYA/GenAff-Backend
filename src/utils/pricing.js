@@ -76,19 +76,14 @@ const MODEL_PRICING = {
   // ── Open-weight models via cloud inference ────────────────────────────
   // Priced competitively below OpenAI equivalents (100% margin on our end).
   //
-  // Budget tier
-  'phi-4-mini':          0.00020,  // ultra-fast tiny model
   // Mid tier
-  'llama-4-scout':       0.00060,  // fast Llama 4 (MoE efficient)
   'qwen-coder-32b':      0.00070,  // top open-source code model
   'qwq-32b':             0.00080,  // reasoning model, R1-class quality
   'llama-3.3-70b':       0.00100,  // best open 70B chat model
   // Premium tier
   'llama-3.1-405b':      0.00200,  // Llama 3.1 flagship 405B
-  'mistral-large-2':     0.00200,  // Mistral's strongest instruction model
   'kimi-k2':             0.00250,  // Moonshot K2 large MoE
   'llama-4-maverick':    0.00300,  // latest Meta flagship (vision + text)
-  'nemotron-ultra-253b': 0.00400,  // largest model in catalog (253B)
 };
 
 /**
