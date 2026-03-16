@@ -95,37 +95,27 @@ async function chatCompletions(req, res) {
     const costInr = calculateCostInr(model, tokensUsed);
 
     // ── Deduct balance ────────────────────────────────────────────
+    // Priority: free units are ALWAYS consumed first before touching
+    // real wallet balance. Wallet is only charged once free units are
+    // exhausted (free_units === 0).
     if (costInr > 0) {
-      if (walletBalance >= costInr) {
-        // Wallet has enough — attempt atomic deduction.
+      if (freeUnits > 0) {
+        // Consume one free unit — regardless of wallet balance.
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { free_units: { decrement: 1 } },
+        }).catch(() => {});
+      } else if (walletBalance >= costInr) {
+        // No free units left — deduct from wallet atomically.
         // deductBalance uses a single SQL UPDATE with a WHERE balance >= cost
         // guard so concurrent requests cannot overdraw.
         try {
           await deductBalance(user.id, costInr);
         } catch (deductErr) {
           // 402 means a concurrent request drained the wallet between our
-          // pre-check above and the actual deduction. Fall back to a free
-          // unit if any remain; otherwise just log — the response is already
-          // sent so we can't charge the user retroactively.
-          if (deductErr.status === 402 && freeUnits > 0) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { free_units: { decrement: 1 } },
-            }).catch(() => {});
-          } else {
-            console.error('[proxyController] Failed to deduct balance:', deductErr.message);
-          }
+          // pre-check above and the actual deduction — just log it.
+          console.error('[proxyController] Failed to deduct balance:', deductErr.message);
         }
-      } else if (walletBalance <= 0 && freeUnits > 0) {
-        // Wallet is empty — consume one free unit.
-        // (walletBalance > 0 but < costInr is an edge case where the user
-        // has some balance but not enough for this request; we do not burn
-        // a free unit in that case — the pre-check already blocked users
-        // with walletBalance <= 0 AND freeUnits <= 0.)
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { free_units: { decrement: 1 } },
-        }).catch(() => {});
       }
     }
 
