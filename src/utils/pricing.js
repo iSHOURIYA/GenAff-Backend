@@ -3,12 +3,15 @@
  *
  * Prices are defined in USD per 1,000 tokens.
  * Blended ratio used: 30% input tokens / 70% output tokens (realistic for chat).
- * GenAff markup: +10% over provider cost.
- * Formula: ((0.3 × input_per_1K) + (0.7 × output_per_1K)) × 1.10
+ * Formula: competitive market rate — providers that cost us $0 are priced to
+ * undercut OpenAI equivalents while maximising margin.
  *
  * Last updated: March 2026
  * Update USD_TO_INR periodically or replace with a live fetch if needed.
  */
+
+// Used for provider detection — never exposed to callers
+const { NVIDIA_MODEL_MAP } = require('../providers/nvidia');
 
 const USD_TO_INR = 86; // 1 USD = ₹86 (updated March 2026)
 
@@ -69,6 +72,23 @@ const MODEL_PRICING = {
   // provider: gemini-2.5-flash $0.0001 blended + 10%
   'gemini-2.5-flash':       0.000110,
   'gemini-2.5-flash-exp':   0.000110,
+
+  // ── Open-weight models via cloud inference ────────────────────────────
+  // Priced competitively below OpenAI equivalents (100% margin on our end).
+  //
+  // Budget tier
+  'phi-4-mini':          0.00020,  // ultra-fast tiny model
+  // Mid tier
+  'llama-4-scout':       0.00060,  // fast Llama 4 (MoE efficient)
+  'qwen-coder-32b':      0.00070,  // top open-source code model
+  'qwq-32b':             0.00080,  // reasoning model, R1-class quality
+  'llama-3.3-70b':       0.00100,  // best open 70B chat model
+  // Premium tier
+  'llama-3.1-405b':      0.00200,  // Llama 3.1 flagship 405B
+  'mistral-large-2':     0.00200,  // Mistral's strongest instruction model
+  'kimi-k2':             0.00250,  // Moonshot K2 large MoE
+  'llama-4-maverick':    0.00300,  // latest Meta flagship (vision + text)
+  'nemotron-ultra-253b': 0.00400,  // largest model in catalog (253B)
 };
 
 /**
@@ -104,6 +124,8 @@ function detectProvider(model) {
   if (m.startsWith('deepseek')) return 'deepseek';
   // Gemini: all variants including -exp suffixes
   if (m.startsWith('gemini')) return 'gemini';
+  // Open-weight models via cloud inference (aliases only — source not disclosed)
+  if (NVIDIA_MODEL_MAP[m]) return 'nvidia';
   return null;
 }
 
@@ -115,4 +137,18 @@ function listSupportedModels() {
   return Object.keys(MODEL_PRICING);
 }
 
-module.exports = { calculateCostInr, detectProvider, listSupportedModels, MODEL_PRICING };
+/**
+ * Return the full model catalog with INR pricing per 1,000 tokens.
+ * Safe to expose to frontend — no provider/source information is included.
+ * @returns {Array<{id: string, price_per_1k_inr: number}>}
+ */
+function getModelCatalog() {
+  return Object.entries(MODEL_PRICING).map(([id, usdPer1K]) => ({
+    id,
+    object: 'model',
+    owned_by: 'genaff',
+    price_per_1k_inr: parseFloat((usdPer1K * USD_TO_INR).toFixed(4)),
+  }));
+}
+
+module.exports = { calculateCostInr, detectProvider, listSupportedModels, getModelCatalog, MODEL_PRICING };

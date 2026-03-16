@@ -1,6 +1,7 @@
 const { callOpenAI } = require('../providers/openai');
 const { callDeepSeek } = require('../providers/deepseek');
 const { callGemini } = require('../providers/gemini');
+const { callNvidia } = require('../providers/nvidia');
 const { calculateCostInr, detectProvider } = require('../utils/pricing');
 const { deductBalance } = require('../services/walletService');
 const { logUsage } = require('../services/usageService');
@@ -10,6 +11,7 @@ const PROVIDER_HANDLERS = {
   openai: callOpenAI,
   deepseek: callDeepSeek,
   gemini: callGemini,
+  nvidia: callNvidia,
 };
 
 /**
@@ -50,7 +52,7 @@ async function chatCompletions(req, res) {
     const provider = detectProvider(model);
     if (!provider) {
       return res.status(400).json({
-        error: `Unsupported model: "${model}". Use a gpt-*, deepseek-*, or gemini-* model.`,
+        error: `Unsupported model: "${model}". Check /v1/models for the list of available models.`,
       });
     }
 
