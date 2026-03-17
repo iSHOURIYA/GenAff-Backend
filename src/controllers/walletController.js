@@ -6,6 +6,10 @@ const {
   getTopUpHistory,
 } = require('../services/walletService');
 const { getUsageHistory, getUsageStats } = require('../services/usageService');
+const {
+  generateTopUpInvoicePdf,
+  generateWalletStatementPdf,
+} = require('../services/billingPdfService');
 
 /**
  * GET /wallet
@@ -169,4 +173,55 @@ async function usageStats(req, res) {
   }
 }
 
-module.exports = { walletBalance, createOrder, verifyPayment, cancelOrder, topUpHistory, usageHistory, usageStats };
+/**
+ * GET /wallet/invoice/:topupId/pdf
+ * Download a branded PDF invoice for a completed top-up.
+ */
+async function downloadTopUpInvoicePdf(req, res) {
+  try {
+    const { topupId } = req.params;
+    const pdfBuffer = await generateTopUpInvoicePdf({ userId: req.user.id, topUpId: topupId });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="genaff-invoice-${topupId.slice(0, 8)}.pdf"`);
+    return res.status(200).send(pdfBuffer);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[walletController.downloadTopUpInvoicePdf]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * GET /wallet/statement/pdf?from=YYYY-MM-DD&to=YYYY-MM-DD
+ * Download branded wallet statement PDF for the selected period.
+ */
+async function downloadWalletStatementPdf(req, res) {
+  try {
+    const { from, to } = req.query;
+    const pdfBuffer = await generateWalletStatementPdf({ userId: req.user.id, from, to });
+
+    const fromSafe = from || 'last-30-days';
+    const toSafe = to || 'today';
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="genaff-wallet-statement-${fromSafe}-to-${toSafe}.pdf"`);
+    return res.status(200).send(pdfBuffer);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[walletController.downloadWalletStatementPdf]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+module.exports = {
+  walletBalance,
+  createOrder,
+  verifyPayment,
+  cancelOrder,
+  topUpHistory,
+  usageHistory,
+  usageStats,
+  downloadTopUpInvoicePdf,
+  downloadWalletStatementPdf,
+};

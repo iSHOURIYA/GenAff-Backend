@@ -3,6 +3,10 @@
         "/^node -e \"require\\('\\./src/services/verificationService'\\); require\\('\\./src/services/emailService'\\); require\\('\\./src/routes/auth'\\); require\\('\\./src/middleware/apiKeyMiddleware'\\); console\\.log\\('All modules load OK'\\)\"$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^node -e \"const r=require\\('\\./src/routes/wallet'\\); console\\.log\\('wallet routes loaded OK:', !!r\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

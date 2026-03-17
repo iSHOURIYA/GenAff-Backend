@@ -7,6 +7,8 @@ const {
   topUpHistory,
   usageHistory,
   usageStats,
+  downloadTopUpInvoicePdf,
+  downloadWalletStatementPdf,
 } = require('../controllers/walletController');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -33,5 +35,11 @@ router.get('/usage', usageHistory);
 
 // GET  /wallet/stats            – aggregate usage stats
 router.get('/stats', usageStats);
+
+// GET  /wallet/invoice/:topupId/pdf     – download top-up invoice PDF
+router.get('/invoice/:topupId/pdf', downloadTopUpInvoicePdf);
+
+// GET  /wallet/statement/pdf            – download wallet statement PDF
+router.get('/statement/pdf', downloadWalletStatementPdf);
 
 module.exports = router;
