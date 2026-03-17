@@ -31,6 +31,7 @@ async function createUser(email, password) {
       email: true,
       created_at: true,
       free_units: true,
+      role: true,
     },
   });
 
@@ -74,6 +75,7 @@ async function getUserById(id) {
       email: true,
       created_at: true,
       free_units: true,
+      role: true,
       wallet: {
         select: { balance_inr: true },
       },

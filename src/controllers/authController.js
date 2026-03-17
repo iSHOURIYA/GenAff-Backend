@@ -64,7 +64,7 @@ async function login(req, res) {
     }
 
     const user = await authenticateUser(email.toLowerCase().trim(), password);
-    const token = signToken({ id: user.id, email: user.email });
+    const token = signToken({ id: user.id, email: user.email, role: user.role });
 
     return res.status(200).json({
       message: 'Login successful',
@@ -74,6 +74,7 @@ async function login(req, res) {
         email: user.email,
         created_at: user.created_at,
         free_units: user.free_units,
+        role: user.role,
       },
     });
   } catch (err) {
