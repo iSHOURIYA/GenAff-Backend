@@ -15,6 +15,7 @@ const helmet = require('helmet');
 const authRoutes   = require('./routes/auth');
 const keyRoutes    = require('./routes/keys');
 const walletRoutes = require('./routes/wallet');
+const adminRoutes  = require('./routes/admin');
 const proxyRoutes  = require('./routes/proxy');
 
 // ── App Setup ─────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ app.get('/health', (_req, res) => {
 app.use('/auth',   authRoutes);
 app.use('/keys',   keyRoutes);
 app.use('/wallet', walletRoutes);
+app.use('/admin',  adminRoutes);
 app.use('/v1',     proxyRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────
