@@ -11,7 +11,7 @@ const { hashPassword } = require('../src/utils/hash');
 
 async function seedAdmin() {
   try {
-    const adminEmail = 'shouriyatayal1234@gmail';
+    const adminEmail = 'shouriyatayal1234@gmail.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'ChangeMe!123'; // Default password, user should change on first login
 
     console.log(`\n🔑 Seeding admin user: ${adminEmail}`);
