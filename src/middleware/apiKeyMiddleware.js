@@ -27,7 +27,12 @@ async function apiKeyMiddleware(req, res, next) {
       where: { key_hash: keyHash },
       include: {
         user: {
-          include: { wallet: true },
+          include: {
+            wallet: true,
+            model_restrictions: {
+              select: { model: true },
+            },
+          },
         },
       },
     });
@@ -44,6 +49,13 @@ async function apiKeyMiddleware(req, res, next) {
       return res.status(403).json({
         error: 'Email not verified',
         message: 'Please verify your email address before using the API. Check your inbox or request a new code at POST /auth/resend-verification',
+      });
+    }
+
+    if (apiKey.user.is_suspended) {
+      return res.status(403).json({
+        error: 'Account suspended',
+        message: 'Your account is currently suspended. Please contact support.',
       });
     }
 

@@ -23,12 +23,14 @@ model User {
   free_units     Int      @default(10)
   email_verified Boolean  @default(false)
   role           UserRole @default(USER)
+  is_suspended   Boolean  @default(false)
 
   api_keys              ApiKey[]
   wallet                Wallet?
   usages                Usage[]
   top_ups               TopUp[]
   pending_verifications PendingVerification[]
+  model_restrictions    UserModelRestriction[]
 
   @@map("users")
 }
@@ -100,4 +102,17 @@ model TopUp {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("top_ups")
+}
+
+model UserModelRestriction {
+  id         String   @id @default(uuid())
+  user_id    String
+  model      String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, model])
+  @@index([user_id])
+  @@map("user_model_restrictions")
 }

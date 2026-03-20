@@ -1,5 +1,32 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { listSupportedModels } = require('../utils/pricing');
+
+function normalizeRestrictedModels(input) {
+  if (!Array.isArray(input)) return { error: 'restricted_models must be an array of model IDs' };
+
+  const supported = new Set(listSupportedModels().map((model) => model.toLowerCase()));
+  const normalized = [];
+  const seen = new Set();
+
+  for (const raw of input) {
+    if (typeof raw !== 'string' || !raw.trim()) {
+      return { error: 'restricted_models must contain non-empty strings' };
+    }
+
+    const model = raw.trim().toLowerCase();
+    if (!supported.has(model)) {
+      return { error: `Unsupported model in restricted_models: ${raw}` };
+    }
+
+    if (!seen.has(model)) {
+      seen.add(model);
+      normalized.push(model);
+    }
+  }
+
+  return { normalized };
+}
 
 /**
  * Admin Dashboard: Comprehensive statistics
@@ -137,6 +164,7 @@ async function listUsers(req, res) {
           id: true, 
           email: true, 
           role: true,
+          is_suspended: true,
           created_at: true,
           email_verified: true
         },
@@ -195,6 +223,13 @@ async function getUserDetails(req, res) {
             active: true
           }
         },
+        model_restrictions: {
+          select: {
+            model: true,
+            created_at: true
+          },
+          orderBy: { model: 'asc' }
+        },
         top_ups: {
           select: {
             id: true,
@@ -223,6 +258,7 @@ async function getUserDetails(req, res) {
           id: user.id,
           email: user.email,
           role: user.role,
+          is_suspended: user.is_suspended,
           email_verified: user.email_verified,
           created_at: user.created_at,
           free_units: user.free_units
@@ -239,7 +275,8 @@ async function getUserDetails(req, res) {
         },
         recent_usages: user.usages,
         recent_topups: user.top_ups,
-        api_keys: user.api_keys
+        api_keys: user.api_keys,
+        restricted_models: user.model_restrictions.map((item) => item.model)
       }
     });
   } catch (err) {
@@ -260,6 +297,10 @@ async function updateUserStatus(req, res) {
       return res.status(400).json({ error: 'suspend must be a boolean' });
     }
 
+    if (req.user.id === userId) {
+      return res.status(400).json({ error: 'You cannot suspend or activate your own admin account' });
+    }
+
     // For now, we'll deactivate API keys instead of deleting the user
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -270,19 +311,16 @@ async function updateUserStatus(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (suspend) {
-      // Deactivate all API keys
-      await prisma.apiKey.updateMany({
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { is_suspended: suspend }
+      }),
+      prisma.apiKey.updateMany({
         where: { user_id: userId },
-        data: { active: false }
-      });
-    } else {
-      // Reactivate all API keys
-      await prisma.apiKey.updateMany({
-        where: { user_id: userId },
-        data: { active: true }
-      });
-    }
+        data: { active: !suspend }
+      })
+    ]);
 
     res.json({
       success: true,
@@ -292,6 +330,161 @@ async function updateUserStatus(req, res) {
   } catch (err) {
     console.error('Update user status error:', err);
     res.status(500).json({ error: 'Failed to update user status', details: err.message });
+  }
+}
+
+async function deleteUserAccount(req, res) {
+  try {
+    const { userId } = req.params;
+
+    if (req.user.id === userId) {
+      return res.status(400).json({ error: 'You cannot delete your own admin account' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    return res.json({
+      success: true,
+      message: `User ${user.email} deleted successfully`,
+      data: { user_id: user.id, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    return res.status(500).json({ error: 'Failed to delete user', details: err.message });
+  }
+}
+
+async function grantFreeUnits(req, res) {
+  try {
+    const { userId } = req.params;
+    const { units, mode = 'add' } = req.body;
+
+    if (!Number.isInteger(units) || units < 0) {
+      return res.status(400).json({ error: 'units must be a non-negative integer' });
+    }
+
+    if (!['add', 'set'].includes(mode)) {
+      return res.status(400).json({ error: 'mode must be either "add" or "set"' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, free_units: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: mode === 'set' ? { free_units: units } : { free_units: { increment: units } },
+      select: { id: true, email: true, free_units: true }
+    });
+
+    return res.json({
+      success: true,
+      message: mode === 'set'
+        ? `Free units set to ${updated.free_units} for ${updated.email}`
+        : `Added ${units} free units to ${updated.email}`,
+      data: {
+        user_id: updated.id,
+        email: updated.email,
+        previous_free_units: user.free_units,
+        current_free_units: updated.free_units,
+        mode,
+        units
+      }
+    });
+  } catch (err) {
+    console.error('Grant free units error:', err);
+    return res.status(500).json({ error: 'Failed to update free units', details: err.message });
+  }
+}
+
+async function getUserModelRestrictions(req, res) {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        model_restrictions: {
+          select: { model: true },
+          orderBy: { model: 'asc' }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        user_id: user.id,
+        email: user.email,
+        restricted_models: user.model_restrictions.map((item) => item.model)
+      }
+    });
+  } catch (err) {
+    console.error('Get user model restrictions error:', err);
+    return res.status(500).json({ error: 'Failed to fetch model restrictions', details: err.message });
+  }
+}
+
+async function updateUserModelRestrictions(req, res) {
+  try {
+    const { userId } = req.params;
+    const { restricted_models = [] } = req.body;
+
+    const { normalized, error } = normalizeRestrictedModels(restricted_models);
+    if (error) {
+      return res.status(400).json({ error });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.$transaction([
+      prisma.userModelRestriction.deleteMany({ where: { user_id: userId } }),
+      ...(normalized.length > 0
+        ? [prisma.userModelRestriction.createMany({
+            data: normalized.map((model) => ({ user_id: userId, model }))
+          })]
+        : [])
+    ]);
+
+    return res.json({
+      success: true,
+      message: `Updated restricted models for ${user.email}`,
+      data: {
+        user_id: user.id,
+        email: user.email,
+        restricted_models: normalized
+      }
+    });
+  } catch (err) {
+    console.error('Update user model restrictions error:', err);
+    return res.status(500).json({ error: 'Failed to update model restrictions', details: err.message });
   }
 }
 
@@ -507,6 +700,10 @@ module.exports = {
   listUsers,
   getUserDetails,
   updateUserStatus,
+  deleteUserAccount,
+  grantFreeUnits,
+  getUserModelRestrictions,
+  updateUserModelRestrictions,
   getModelAnalytics,
   getRevenueBreakdown,
   getTransactionHistory

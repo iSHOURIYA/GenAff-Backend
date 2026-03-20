@@ -7,6 +7,10 @@ const {
   listUsers,
   getUserDetails,
   updateUserStatus,
+  deleteUserAccount,
+  grantFreeUnits,
+  getUserModelRestrictions,
+  updateUserModelRestrictions,
   getModelAnalytics,
   getRevenueBreakdown,
   getTransactionHistory
@@ -41,6 +45,32 @@ router.get('/users/:userId', authMiddleware, adminMiddleware, getUserDetails);
  * Body: { suspend: boolean }
  */
 router.put('/users/:userId/status', authMiddleware, adminMiddleware, updateUserStatus);
+
+/**
+ * DELETE /admin/users/:userId
+ * Permanently delete user account and all related data (cascade)
+ */
+router.delete('/users/:userId', authMiddleware, adminMiddleware, deleteUserAccount);
+
+/**
+ * PATCH /admin/users/:userId/free-units
+ * Add or set free units for a user
+ * Body: { units: number, mode?: 'add' | 'set' }
+ */
+router.patch('/users/:userId/free-units', authMiddleware, adminMiddleware, grantFreeUnits);
+
+/**
+ * GET /admin/users/:userId/model-restrictions
+ * Returns list of restricted model IDs for the user
+ */
+router.get('/users/:userId/model-restrictions', authMiddleware, adminMiddleware, getUserModelRestrictions);
+
+/**
+ * PUT /admin/users/:userId/model-restrictions
+ * Replace restricted model list for the user
+ * Body: { restricted_models: string[] }
+ */
+router.put('/users/:userId/model-restrictions', authMiddleware, adminMiddleware, updateUserModelRestrictions);
 
 /**
  * GET /admin/models/analytics

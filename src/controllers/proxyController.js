@@ -48,6 +48,14 @@ async function chatCompletions(req, res) {
       return res.status(400).json({ error: '"messages" array is required' });
     }
 
+    const restrictedModels = (user.model_restrictions || []).map((item) => item.model);
+    if (restrictedModels.includes(model.toLowerCase())) {
+      return res.status(403).json({
+        error: 'Model restricted for this account',
+        message: `The model "${model}" is restricted for your account.`,
+      });
+    }
+
     // ── Detect provider ──────────────────────────────────────────
     const provider = detectProvider(model);
     if (!provider) {
