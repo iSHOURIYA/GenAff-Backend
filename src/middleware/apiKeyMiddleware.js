@@ -45,6 +45,13 @@ async function apiKeyMiddleware(req, res, next) {
       return res.status(403).json({ error: 'API key is disabled' });
     }
 
+    if (apiKey.expires_at && new Date() > apiKey.expires_at) {
+      return res.status(401).json({
+        error: 'API key expired',
+        message: 'This temporary key has expired. Please create a new playground session.',
+      });
+    }
+
     if (!apiKey.user.email_verified) {
       return res.status(403).json({
         error: 'Email not verified',
@@ -61,6 +68,7 @@ async function apiKeyMiddleware(req, res, next) {
 
     req.apiKey = apiKey;
     req.apiKeyUser = apiKey.user;
+    req.playgroundSessionId = apiKey.playground_session_id || null;
     next();
   } catch (err) {
     console.error('[apiKeyMiddleware] error:', err);

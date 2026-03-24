@@ -18,6 +18,8 @@ const walletRoutes = require('./routes/wallet');
 const adminRoutes  = require('./routes/admin');
 const proxyRoutes  = require('./routes/proxy');
 const { startHealthCheckSchedule } = require('./services/modelHealthCheckService');
+const playgroundRoutes = require('./routes/playground');
+const { startPlaygroundCleanupSchedule } = require('./services/playgroundService');
 
 // ── App Setup ─────────────────────────────────────────────────────────
 const app = express();
@@ -74,6 +76,7 @@ app.use('/keys',   keyRoutes);
 app.use('/wallet', walletRoutes);
 app.use('/admin',  adminRoutes);
 app.use('/v1',     proxyRoutes);
+app.use('/playground', playgroundRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -100,6 +103,8 @@ app.listen(PORT, () => {
 
   // Start model health checks (runs in background)
   startHealthCheckSchedule();
+  // Start playground cleanup schedule (deactivates expired temporary keys/sessions)
+  startPlaygroundCleanupSchedule();
 });
 
 module.exports = app; // export for testing

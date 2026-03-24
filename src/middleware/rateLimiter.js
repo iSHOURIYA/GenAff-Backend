@@ -96,6 +96,18 @@ const resetPasswordRateLimiter = rateLimit({
   message: { error: 'Too many password reset attempts. Please wait 15 minutes before trying again.' },
 });
 
+/**
+ * Playground session creation limiter – controls temporary key creation.
+ * 10 sessions per hour per IP.
+ */
+const playgroundSessionRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many playground sessions created. Please try again later.' },
+});
+
 module.exports = {
   proxyRateLimiter,
   authRateLimiter,
@@ -103,4 +115,5 @@ module.exports = {
   otpRateLimiter,
   forgotPasswordRateLimiter,
   resetPasswordRateLimiter,
+  playgroundSessionRateLimiter,
 };

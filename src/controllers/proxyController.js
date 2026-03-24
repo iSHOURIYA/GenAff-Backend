@@ -5,6 +5,7 @@ const { callNvidia } = require('../providers/nvidia');
 const { calculateCostInr, detectProvider } = require('../utils/pricing');
 const { deductBalance } = require('../services/walletService');
 const { logUsage } = require('../services/usageService');
+const { storePlaygroundTurn } = require('../services/playgroundService');
 const prisma = require('../services/prismaClient');
 
 const PROVIDER_HANDLERS = {
@@ -138,6 +139,24 @@ async function chatCompletions(req, res) {
       tokensUsed,
       costInr,
     }).catch((err) => console.error('[proxyController] logUsage error:', err.message));
+
+    if (req.playgroundSessionId && apiKey.is_playground) {
+      const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+      const assistantMessage = responseData?.choices?.[0]?.message?.content;
+
+      if (lastUserMessage?.content && assistantMessage) {
+        storePlaygroundTurn({
+          sessionId: req.playgroundSessionId,
+          apiKeyId: apiKey.id,
+          provider,
+          model,
+          userMessage: String(lastUserMessage.content),
+          assistantMessage: String(assistantMessage),
+          tokensUsed,
+          costInr,
+        }).catch((err) => console.error('[proxyController] storePlaygroundTurn error:', err.message));
+      }
+    }
 
     // ── Return response ───────────────────────────────────────────
     return res.status(200).json(responseData);
