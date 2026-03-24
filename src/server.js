@@ -11,12 +11,13 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 
-// ── Routes ────────────────────────────────────────────────────────────
+// ── Routes & Services ────────────────────────────────────────────────
 const authRoutes   = require('./routes/auth');
 const keyRoutes    = require('./routes/keys');
 const walletRoutes = require('./routes/wallet');
 const adminRoutes  = require('./routes/admin');
 const proxyRoutes  = require('./routes/proxy');
+const { startHealthCheckSchedule } = require('./services/modelHealthCheckService');
 
 // ── App Setup ─────────────────────────────────────────────────────────
 const app = express();
@@ -96,6 +97,9 @@ app.listen(PORT, () => {
   console.log(`    ENV  : ${process.env.NODE_ENV || 'development'}`);
   console.log(`    URL  : http://localhost:${PORT}`);
   console.log(`    Health: http://localhost:${PORT}/health\n`);
+
+  // Start model health checks (runs in background)
+  startHealthCheckSchedule();
 });
 
 module.exports = app; // export for testing

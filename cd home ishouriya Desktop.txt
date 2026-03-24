@@ -1,0 +1,61 @@
+cd /home/ishouriya/Desktop/GenAff-Backend
+
+cat > .gitignore << 'EOF'
+node_modules/
+.env
+*.log
+EOF
+
+git add .
+git commit -m "feat: production-ready GenAff backend"
+git push origin main
+
+
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PostgreSQL
+sudo apt install postgresql postgresql-contrib -y
+
+# Install PM2 + Nginx
+sudo npm install -g pm2
+sudo apt install nginx -y
+
+# Create DB
+sudo -u postgres psql -c "CREATE USER genaff_user WITH PASSWORD 'your_strong_password';"
+sudo -u postgres psql -c "CREATE DATABASE genaff OWNER genaff_user;"
+
+
+git clone https://github.com/yourusername/genaff-backend.git
+cd genaff-backend
+npm install
+cp .env.example .env
+nano .env   # fill in LIVE values — NODE_ENV=production, rzp_live_ keys, real DB URL
+npm run build        # prisma generate
+npm run db:migrate   # prisma migrate deploy
+pm2 start src/server.js --name genaff-backend
+pm2 save && pm2 startup
+
+sudo nano /etc/nginx/sites-available/genaff-api
+
+server {
+    listen 80;
+    server_name genaff-api.shauryacodes.xyz;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+}
+
+sudo ln -s /etc/nginx/sites-available/genaff-api /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d genaff-api.shauryacodes.xyz
+
+
+for futerre updates 
+cd genaff-backend && git pull origin main && npm install && pm2 restart genaff-backend

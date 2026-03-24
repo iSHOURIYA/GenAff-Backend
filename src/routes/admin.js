@@ -15,6 +15,7 @@ const {
   getRevenueBreakdown,
   getTransactionHistory
 } = require('../controllers/adminController');
+const { getHealthStatus, forceHealthCheck } = require('../services/modelHealthCheckService');
 
 /**
  * All admin routes require authentication AND admin role
@@ -92,5 +93,64 @@ router.get('/revenue/breakdown', authMiddleware, adminMiddleware, getRevenueBrea
  * Query params: page (default 1), limit (default 100), type ('topup'/'usage'/mix)
  */
 router.get('/transactions', authMiddleware, adminMiddleware, getTransactionHistory);
+
+/**
+ * GET /admin/models/health
+ * View current model health status and cache age
+ */
+router.get('/models/health', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const health = await getHealthStatus();
+    const summary = {
+      healthy: Object.values(health).filter((h) => h.status === 'healthy').length,
+      unhealthy: Object.values(health).filter((h) => h.status === 'unhealthy').length,
+      error: Object.values(health).filter((h) => h.status === 'error').length,
+      total: Object.keys(health).length,
+    };
+
+    return res.json({
+      success: true,
+      data: {
+        summary,
+        models: Object.entries(health)
+          .map(([model, status]) => ({
+            model,
+            status: status.status,
+            error: status.error || null,
+            checked_at: new Date(status.timestamp).toISOString(),
+          }))
+          .sort((a, b) => {
+            // Sort: healthy first, then by model name
+            if (a.status !== b.status) {
+              return a.status === 'healthy' ? -1 : 1;
+            }
+            return a.model.localeCompare(b.model);
+          }),
+      },
+    });
+  } catch (err) {
+    console.error('[admin.models.health] Error:', err);
+    return res.status(500).json({ error: 'Failed to fetch model health status' });
+  }
+});
+
+/**
+ * POST /admin/models/health/refresh
+ * Force an immediate model health check (async, non-blocking)
+ */
+router.post('/models/health/refresh', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    // Trigger refresh in background (don't wait)
+    forceHealthCheck().catch((err) => console.error('[admin.models.health.refresh] Error:', err));
+
+    return res.json({
+      success: true,
+      message: 'Model health check triggered. Results will be available shortly.',
+    });
+  } catch (err) {
+    console.error('[admin.models.health.refresh] Error:', err);
+    return res.status(500).json({ error: 'Failed to trigger health check' });
+  }
+});
 
 module.exports = router;
