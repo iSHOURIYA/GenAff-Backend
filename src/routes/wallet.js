@@ -9,6 +9,7 @@ const {
   usageStats,
   downloadTopUpInvoicePdf,
   downloadWalletStatementPdf,
+  downloadCombinedBillingPdf,
 } = require('../controllers/walletController');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -41,5 +42,8 @@ router.get('/invoice/:topupId/pdf', downloadTopUpInvoicePdf);
 
 // GET  /wallet/statement/pdf            – download wallet statement PDF
 router.get('/statement/pdf', downloadWalletStatementPdf);
+
+// GET  /wallet/billing/pdf              – download combined statement + receipt PDF
+router.get('/billing/pdf', downloadCombinedBillingPdf);
 
 module.exports = router;

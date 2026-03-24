@@ -9,6 +9,7 @@ const { getUsageHistory, getUsageStats } = require('../services/usageService');
 const {
   generateTopUpInvoicePdf,
   generateWalletStatementPdf,
+  generateCombinedBillingPdf,
 } = require('../services/billingPdfService');
 
 /**
@@ -214,6 +215,32 @@ async function downloadWalletStatementPdf(req, res) {
   }
 }
 
+/**
+ * GET /wallet/billing/pdf?from=YYYY-MM-DD&to=YYYY-MM-DD&topupId=<optional>
+ * Download combined bill PDF with statement + top-up receipt section.
+ */
+async function downloadCombinedBillingPdf(req, res) {
+  try {
+    const { from, to, topupId } = req.query;
+    const pdfBuffer = await generateCombinedBillingPdf({
+      userId: req.user.id,
+      from,
+      to,
+      topUpId: topupId,
+    });
+
+    const fromSafe = from || 'last-30-days';
+    const toSafe = to || 'today';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="genaff-billing-${fromSafe}-to-${toSafe}.pdf"`);
+    return res.status(200).send(pdfBuffer);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[walletController.downloadCombinedBillingPdf]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   walletBalance,
   createOrder,
@@ -224,4 +251,5 @@ module.exports = {
   usageStats,
   downloadTopUpInvoicePdf,
   downloadWalletStatementPdf,
+  downloadCombinedBillingPdf,
 };

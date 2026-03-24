@@ -8,6 +8,15 @@ const BRAND = {
   signatory: process.env.BILLING_SIGNATORY_NAME || 'Ishouriya',
 };
 
+const THEME = {
+  primary: '#0B5FFF',
+  heading: '#111827',
+  muted: '#6B7280',
+  border: '#D1D5DB',
+  rowAlt: '#F9FAFB',
+  cardBg: '#F3F4F6',
+};
+
 function formatDate(date) {
   return new Date(date).toLocaleString('en-IN', {
     year: 'numeric',
@@ -37,19 +46,113 @@ function createPdfBuffer(renderFn) {
 }
 
 function drawBrandHeader(doc, title) {
-  doc.fontSize(26).text(BRAND.name, { align: 'left' });
-  doc.fontSize(10).fillColor('#666').text(BRAND.website);
-  doc.text(BRAND.supportEmail);
-  doc.moveDown();
-  doc.fillColor('#111').fontSize(18).text(title, { align: 'right' });
-  doc.moveDown(1.5);
+  const x = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const top = doc.y;
+
+  doc.save();
+  doc.roundedRect(x, top, width, 72, 8).fill(THEME.cardBg);
+  doc.restore();
+
+  doc.fillColor(THEME.primary).fontSize(24).text(BRAND.name, x + 16, top + 14);
+  doc.fillColor(THEME.muted).fontSize(10)
+    .text(BRAND.website, x + 16, top + 44)
+    .text(BRAND.supportEmail, x + 16, top + 56);
+
+  doc.fillColor(THEME.heading).fontSize(17).text(title, x + 290, top + 20, {
+    width: width - 306,
+    align: 'right',
+  });
+
+  doc.y = top + 88;
 }
 
 function drawSignature(doc) {
-  doc.moveDown(2);
-  doc.fontSize(10).fillColor('#111').text('Authorised Signatory', { align: 'right' });
+  if (doc.y > 710) {
+    doc.addPage();
+  }
+  doc.moveDown(1.2);
+  doc.strokeColor(THEME.border).lineWidth(1).moveTo(390, doc.y).lineTo(545, doc.y).stroke();
   doc.moveDown(0.3);
-  doc.fontSize(16).text(BRAND.signatory, { align: 'right' });
+  doc.fontSize(10).fillColor(THEME.muted).text('Authorised Signatory', { align: 'right' });
+  doc.moveDown(0.3);
+  doc.fontSize(15).fillColor(THEME.heading).text(BRAND.signatory, { align: 'right' });
+}
+
+function ensurePageSpace(doc, requiredHeight) {
+  if (doc.y + requiredHeight > doc.page.height - doc.page.margins.bottom) {
+    doc.addPage();
+  }
+}
+
+function drawSectionTitle(doc, text) {
+  ensurePageSpace(doc, 36);
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor(THEME.heading).text(text);
+  doc.moveDown(0.2);
+  doc.strokeColor(THEME.border).lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+  doc.moveDown(0.5);
+}
+
+function drawInfoCard(doc, rows, options = {}) {
+  const x = options.x || 50;
+  const width = options.width || 495;
+  const rowHeight = options.rowHeight || 16;
+  const paddingY = 12;
+  const cardHeight = paddingY * 2 + rows.length * rowHeight;
+
+  ensurePageSpace(doc, cardHeight + 8);
+  const top = doc.y;
+
+  doc.save();
+  doc.roundedRect(x, top, width, cardHeight, 6).fill('#FFFFFF');
+  doc.roundedRect(x, top, width, cardHeight, 6).strokeColor(THEME.border).lineWidth(1).stroke();
+  doc.restore();
+
+  let rowY = top + paddingY;
+  rows.forEach(({ label, value }) => {
+    doc.fontSize(10).fillColor(THEME.muted).text(label, x + 12, rowY, { width: 165 });
+    doc.fontSize(10).fillColor(THEME.heading).text(String(value), x + 180, rowY, { width: width - 192 });
+    rowY += rowHeight;
+  });
+
+  doc.y = top + cardHeight + 8;
+}
+
+function drawTxnTableHeader(doc) {
+  ensurePageSpace(doc, 24);
+  const y = doc.y;
+  doc.save();
+  doc.rect(50, y, 495, 22).fill(THEME.cardBg);
+  doc.restore();
+
+  doc.fontSize(10).fillColor(THEME.heading)
+    .text('Date', 58, y + 6, { width: 105 })
+    .text('Type', 168, y + 6, { width: 60 })
+    .text('Description', 232, y + 6, { width: 210 })
+    .text('Amount', 444, y + 6, { width: 93, align: 'right' });
+
+  doc.y = y + 24;
+}
+
+function drawTxnRow(doc, row, rowIndex) {
+  ensurePageSpace(doc, 20);
+  const y = doc.y;
+
+  if (rowIndex % 2 === 1) {
+    doc.save();
+    doc.rect(50, y, 495, 18).fill(THEME.rowAlt);
+    doc.restore();
+  }
+
+  const amountText = `${row.type === 'DEBIT' ? '-' : '+'}${moneyInr(row.amount).replace('₹', '')}`;
+  doc.fontSize(9).fillColor(THEME.heading)
+    .text(formatDate(row.date), 58, y + 5, { width: 105 })
+    .text(row.type, 168, y + 5, { width: 60 })
+    .text(row.description, 232, y + 5, { width: 210 })
+    .text(amountText, 444, y + 5, { width: 93, align: 'right' });
+
+  doc.y = y + 18;
 }
 
 async function getTopUpForInvoice(userId, topUpId) {
@@ -83,36 +186,34 @@ async function generateTopUpInvoicePdf({ userId, topUpId }) {
   return createPdfBuffer((doc) => {
     drawBrandHeader(doc, 'Payment Invoice');
 
-    doc.fontSize(11)
-      .text(`Invoice No: INV-${topUp.id.slice(0, 8).toUpperCase()}`)
-      .text(`Invoice Date: ${formatDate(topUp.created_at)}`)
-      .text(`Customer: ${topUp.user.email}`)
-      .text(`Customer ID: ${topUp.user.id}`)
-      .moveDown();
+    drawInfoCard(doc, [
+      { label: 'Invoice No', value: `INV-${topUp.id.slice(0, 8).toUpperCase()}` },
+      { label: 'Invoice Date', value: formatDate(topUp.created_at) },
+      { label: 'Customer', value: topUp.user.email },
+      { label: 'Customer ID', value: topUp.user.id },
+      { label: 'Status', value: String(topUp.status).toUpperCase() },
+    ]);
 
-    doc.fontSize(12).text('Description', 50, doc.y, { continued: true });
-    doc.text('Amount', 430, doc.y, { align: 'right' });
-    doc.moveDown(0.3);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
+    drawSectionTitle(doc, 'Charges');
+    drawTxnTableHeader(doc);
+    drawTxnRow(doc, {
+      date: topUp.created_at,
+      type: 'CREDIT',
+      description: `Wallet Top-up (${topUp.razorpay_payment_id || 'manual confirmation'})`,
+      amount: Number(topUp.amount),
+    }, 0);
 
-    doc.fontSize(11)
-      .text(`Wallet Top-up (${topUp.razorpay_payment_id || 'manual confirmation'})`, 50, doc.y, { continued: true })
-      .text(moneyInr(topUp.amount), 430, doc.y, { align: 'right' });
+    doc.moveDown(0.7);
+    doc.fontSize(12).fillColor(THEME.heading).text(`Total Paid: ${moneyInr(topUp.amount)}`, 50, doc.y, {
+      align: 'right',
+      width: 495,
+    });
 
-    doc.moveDown(0.6);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    doc.fontSize(12)
-      .text('Total Paid', 50, doc.y, { continued: true })
-      .text(moneyInr(topUp.amount), 430, doc.y, { align: 'right' });
-
-    doc.moveDown(1.2);
-    doc.fontSize(10).fillColor('#666')
-      .text(`Razorpay Order ID: ${topUp.razorpay_order_id || '-'}`)
-      .text(`Razorpay Payment ID: ${topUp.razorpay_payment_id || '-'}`)
-      .text(`Status: ${topUp.status}`);
+    drawSectionTitle(doc, 'Payment Reference');
+    drawInfoCard(doc, [
+      { label: 'Razorpay Order ID', value: topUp.razorpay_order_id || '-' },
+      { label: 'Razorpay Payment ID', value: topUp.razorpay_payment_id || '-' },
+    ]);
 
     drawSignature(doc);
   });
@@ -176,6 +277,156 @@ async function getStatementRows(userId, fromDate, toDate) {
   return { user, rows };
 }
 
+async function getCombinedBillingData(userId, fromDate, toDate, topUpId) {
+  const [user, topUps, usages, selectedTopUp] = await prisma.$transaction([
+    prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } }),
+    prisma.topUp.findMany({
+      where: { user_id: userId, status: 'completed', created_at: { gte: fromDate, lte: toDate } },
+      orderBy: { created_at: 'asc' },
+      select: {
+        id: true,
+        amount: true,
+        created_at: true,
+        razorpay_order_id: true,
+        razorpay_payment_id: true,
+        status: true,
+      },
+    }),
+    prisma.usage.findMany({
+      where: { user_id: userId, created_at: { gte: fromDate, lte: toDate } },
+      orderBy: { created_at: 'asc' },
+      select: { id: true, model: true, tokens_used: true, cost_inr: true, created_at: true },
+    }),
+    topUpId
+      ? prisma.topUp.findFirst({
+          where: { id: topUpId, user_id: userId },
+          select: {
+            id: true,
+            amount: true,
+            created_at: true,
+            razorpay_order_id: true,
+            razorpay_payment_id: true,
+            status: true,
+          },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (topUpId && !selectedTopUp) {
+    const err = new Error('Top-up not found for this user');
+    err.status = 404;
+    throw err;
+  }
+
+  if (selectedTopUp && selectedTopUp.status !== 'completed') {
+    const err = new Error('Selected top-up is not completed');
+    err.status = 400;
+    throw err;
+  }
+
+  const statementRows = [
+    ...topUps.map((item) => ({
+      date: item.created_at,
+      type: 'CREDIT',
+      description: `Top-up (${item.razorpay_payment_id || item.id.slice(0, 8)})`,
+      amount: Number(item.amount),
+    })),
+    ...usages.map((item) => ({
+      date: item.created_at,
+      type: 'DEBIT',
+      description: `${item.model} · ${item.tokens_used} tokens`,
+      amount: Number(item.cost_inr),
+    })),
+  ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  return { user, topUps, statementRows, selectedTopUp };
+}
+
+async function generateCombinedBillingPdf({ userId, from, to, topUpId }) {
+  const { fromDate, toDate } = parseDateRange(from, to);
+  const { user, topUps, statementRows, selectedTopUp } = await getCombinedBillingData(userId, fromDate, toDate, topUpId);
+
+  let totalCredits = 0;
+  let totalDebits = 0;
+  statementRows.forEach((row) => {
+    if (row.type === 'CREDIT') totalCredits += row.amount;
+    if (row.type === 'DEBIT') totalDebits += row.amount;
+  });
+
+  return createPdfBuffer((doc) => {
+    drawBrandHeader(doc, 'Billing Statement & Top-up Receipt');
+
+    drawInfoCard(doc, [
+      { label: 'Bill No', value: `BILL-${user.id.slice(0, 6).toUpperCase()}-${Date.now().toString().slice(-6)}` },
+      { label: 'Generated On', value: formatDate(new Date()) },
+      { label: 'Customer', value: user.email },
+      { label: 'Customer ID', value: user.id },
+      { label: 'Period', value: `${formatDate(fromDate)} to ${formatDate(toDate)}` },
+    ]);
+
+    if (selectedTopUp) {
+      drawSectionTitle(doc, 'Selected Top-up Receipt');
+      drawInfoCard(doc, [
+        { label: 'Top-up ID', value: selectedTopUp.id },
+        { label: 'Top-up Date', value: formatDate(selectedTopUp.created_at) },
+        { label: 'Amount Paid', value: moneyInr(selectedTopUp.amount) },
+        { label: 'Razorpay Order ID', value: selectedTopUp.razorpay_order_id || '-' },
+        { label: 'Razorpay Payment ID', value: selectedTopUp.razorpay_payment_id || '-' },
+        { label: 'Status', value: String(selectedTopUp.status).toUpperCase() },
+      ]);
+    }
+
+    drawSectionTitle(doc, 'Summary');
+    drawInfoCard(doc, [
+      { label: 'Total Top-ups (Credits)', value: moneyInr(totalCredits) },
+      { label: 'Total Usage (Debits)', value: moneyInr(totalDebits) },
+      { label: 'Net Change', value: moneyInr(totalCredits - totalDebits) },
+    ]);
+
+    drawSectionTitle(doc, 'Top-up Receipts in Period');
+    if (topUps.length === 0) {
+      doc.fontSize(10).fillColor(THEME.muted).text('No completed top-ups in selected period.');
+      doc.moveDown();
+    } else {
+      drawTxnTableHeader(doc);
+      topUps.forEach((t, index) => {
+        drawTxnRow(doc, {
+          date: t.created_at,
+          type: 'CREDIT',
+          description: `Top-up (${t.razorpay_payment_id || t.id.slice(0, 8)})`,
+          amount: Number(t.amount),
+        }, index);
+      });
+      doc.moveDown();
+    }
+
+    drawSectionTitle(doc, 'Statement Transactions');
+    drawTxnTableHeader(doc);
+
+    if (statementRows.length === 0) {
+      doc.fontSize(10).fillColor(THEME.muted).text('No transactions in selected period.');
+    } else {
+      statementRows.forEach((row, index) => {
+        if (doc.y > 742) {
+          doc.addPage();
+          drawBrandHeader(doc, 'Billing Statement (Continued)');
+          drawSectionTitle(doc, 'Statement Transactions (Continued)');
+          drawTxnTableHeader(doc);
+        }
+        drawTxnRow(doc, row, index);
+      });
+    }
+
+    drawSignature(doc);
+  });
+}
+
 async function generateWalletStatementPdf({ userId, from, to }) {
   const { fromDate, toDate } = parseDateRange(from, to);
   const { user, rows } = await getStatementRows(userId, fromDate, toDate);
@@ -190,36 +441,29 @@ async function generateWalletStatementPdf({ userId, from, to }) {
   return createPdfBuffer((doc) => {
     drawBrandHeader(doc, 'Wallet Statement');
 
-    doc.fontSize(11)
-      .text(`Account: ${user.email}`)
-      .text(`Customer ID: ${user.id}`)
-      .text(`Period: ${formatDate(fromDate)} to ${formatDate(toDate)}`)
-      .moveDown();
+    drawInfoCard(doc, [
+      { label: 'Account', value: user.email },
+      { label: 'Customer ID', value: user.id },
+      { label: 'Period', value: `${formatDate(fromDate)} to ${formatDate(toDate)}` },
+      { label: 'Total Credits', value: moneyInr(totalCredits) },
+      { label: 'Total Debits', value: moneyInr(totalDebits) },
+      { label: 'Net Change', value: moneyInr(totalCredits - totalDebits) },
+    ]);
 
-    doc.fontSize(11)
-      .text(`Total Credits: ${moneyInr(totalCredits)}`)
-      .text(`Total Debits: ${moneyInr(totalDebits)}`)
-      .text(`Net Change: ${moneyInr(totalCredits - totalDebits)}`)
-      .moveDown();
-
-    doc.fontSize(11).text('Date', 50, doc.y, { continued: true });
-    doc.text('Type', 170, doc.y, { continued: true });
-    doc.text('Description', 240, doc.y, { continued: true });
-    doc.text('Amount', 430, doc.y, { align: 'right' });
-    doc.moveDown(0.3);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
+    drawSectionTitle(doc, 'Transactions');
+    drawTxnTableHeader(doc);
 
     if (rows.length === 0) {
-      doc.fontSize(11).text('No transactions in selected period.');
+      doc.fontSize(10).fillColor(THEME.muted).text('No transactions in selected period.');
     } else {
-      rows.forEach((row) => {
-        if (doc.y > 740) doc.addPage();
-        doc.fontSize(10)
-          .text(formatDate(row.date), 50, doc.y, { continued: true, width: 110 })
-          .text(row.type, 170, doc.y, { continued: true, width: 60 })
-          .text(row.description, 240, doc.y, { continued: true, width: 170 })
-          .text(`${row.type === 'DEBIT' ? '-' : '+'}${moneyInr(row.amount).replace('₹', '')}`, 430, doc.y, { align: 'right' });
+      rows.forEach((row, index) => {
+        if (doc.y > 742) {
+          doc.addPage();
+          drawBrandHeader(doc, 'Wallet Statement (Continued)');
+          drawSectionTitle(doc, 'Transactions (Continued)');
+          drawTxnTableHeader(doc);
+        }
+        drawTxnRow(doc, row, index);
       });
     }
 
@@ -230,4 +474,5 @@ async function generateWalletStatementPdf({ userId, from, to }) {
 module.exports = {
   generateTopUpInvoicePdf,
   generateWalletStatementPdf,
+  generateCombinedBillingPdf,
 };
