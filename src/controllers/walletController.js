@@ -3,6 +3,7 @@ const {
   createTopUpOrder,
   verifyAndCreditWallet,
   cancelTopUpOrder,
+  getPendingTopUp,
   getTopUpHistory,
 } = require('../services/walletService');
 const { getUsageHistory, getUsageStats } = require('../services/usageService');
@@ -130,6 +131,21 @@ async function cancelOrder(req, res) {
 }
 
 /**
+ * GET /wallet/topup/pending
+ * Get the user's pending top-up order if any.
+ * Frontend can use this to check before attempting to create a new order.
+ */
+async function getPendingOrder(req, res) {
+  try {
+    const pending = await getPendingTopUp(req.user.id);
+    return res.status(200).json({ pending });
+  } catch (err) {
+    console.error('[walletController.getPendingOrder]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
  * GET /wallet/history
  * Return top-up transaction history.
  */
@@ -246,6 +262,7 @@ module.exports = {
   createOrder,
   verifyPayment,
   cancelOrder,
+  getPendingOrder,
   topUpHistory,
   usageHistory,
   usageStats,

@@ -4,6 +4,7 @@ const {
   createOrder,
   verifyPayment,
   cancelOrder,
+  getPendingOrder,
   topUpHistory,
   usageHistory,
   usageStats,
@@ -24,6 +25,9 @@ router.post('/topup/order', createOrder);
 
 // POST /wallet/topup/verify     – verify signature & credit wallet (Step 2)
 router.post('/topup/verify', verifyPayment);
+
+// GET  /wallet/topup/pending    – check for pending top-up
+router.get('/topup/pending', getPendingOrder);
 
 // POST /wallet/topup/cancel     – cancel a pending order
 router.post('/topup/cancel', cancelOrder);

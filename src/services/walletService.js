@@ -192,6 +192,23 @@ async function getTopUpHistory(userId, limit = 20) {
 }
 
 /**
+ * Get the user's pending top-up order if any.
+ * @param {string} userId
+ * @returns {Promise<object|null>}
+ */
+async function getPendingTopUp(userId) {
+  return prisma.topUp.findFirst({
+    where: { user_id: userId, status: 'pending' },
+    select: {
+      id: true,
+      amount: true,
+      razorpay_order_id: true,
+      created_at: true,
+    },
+  });
+}
+
+/**
  * Cancel a pending top-up order.
  * Only the owner can cancel their own pending order.
  * @param {string} userId
@@ -220,6 +237,7 @@ module.exports = {
   createTopUpOrder,
   verifyAndCreditWallet,
   cancelTopUpOrder,
+  getPendingTopUp,
   deductBalance,
   getTopUpHistory,
 };
