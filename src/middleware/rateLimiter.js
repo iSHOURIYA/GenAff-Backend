@@ -98,13 +98,16 @@ const resetPasswordRateLimiter = rateLimit({
 
 /**
  * Playground session creation limiter – controls temporary key creation.
- * 10 sessions per hour per IP.
+ * 10 sessions per hour per authenticated user.
  */
 const playgroundSessionRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  // authMiddleware runs before this limiter in /playground routes.
+  // Fallback to IP if req.user is unavailable for safety.
+  keyGenerator: (req) => req.user?.id || req.ip,
   message: { error: 'Too many playground sessions created. Please try again later.' },
 });
 
