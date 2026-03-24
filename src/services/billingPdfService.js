@@ -278,7 +278,7 @@ async function getStatementRows(userId, fromDate, toDate) {
 }
 
 async function getCombinedBillingData(userId, fromDate, toDate, topUpId) {
-  const [user, topUps, usages, selectedTopUp] = await prisma.$transaction([
+  const [user, topUps, usages] = await prisma.$transaction([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } }),
     prisma.topUp.findMany({
       where: { user_id: userId, status: 'completed', created_at: { gte: fromDate, lte: toDate } },
@@ -297,20 +297,21 @@ async function getCombinedBillingData(userId, fromDate, toDate, topUpId) {
       orderBy: { created_at: 'asc' },
       select: { id: true, model: true, tokens_used: true, cost_inr: true, created_at: true },
     }),
-    topUpId
-      ? prisma.topUp.findFirst({
-          where: { id: topUpId, user_id: userId },
-          select: {
-            id: true,
-            amount: true,
-            created_at: true,
-            razorpay_order_id: true,
-            razorpay_payment_id: true,
-            status: true,
-          },
-        })
-      : Promise.resolve(null),
   ]);
+
+  const selectedTopUp = topUpId
+    ? await prisma.topUp.findFirst({
+        where: { id: topUpId, user_id: userId },
+        select: {
+          id: true,
+          amount: true,
+          created_at: true,
+          razorpay_order_id: true,
+          razorpay_payment_id: true,
+          status: true,
+        },
+      })
+    : null;
 
   if (!user) {
     const err = new Error('User not found');
