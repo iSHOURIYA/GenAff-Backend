@@ -1,6 +1,8 @@
 const prisma = require('./prismaClient');
 const { generateApiKey, hashApiKey, getKeyPrefix } = require('../utils/hash');
 
+const MAX_ACTIVE_API_KEYS_PER_USER = parseInt(process.env.MAX_ACTIVE_API_KEYS_PER_USER || '5', 10);
+
 /**
  * List all active API keys for a user.
  * Returns key_prefix (safe to display) and metadata – never the raw key.
@@ -27,6 +29,20 @@ async function listKeys(userId) {
  * @returns {Promise<{rawKey: string, record: object}>}
  */
 async function createKey(userId) {
+  const activeKeyCount = await prisma.apiKey.count({
+    where: {
+      user_id: userId,
+      active: true,
+      is_playground: false,
+    },
+  });
+
+  if (activeKeyCount >= MAX_ACTIVE_API_KEYS_PER_USER) {
+    const err = new Error(`You can have at most ${MAX_ACTIVE_API_KEYS_PER_USER} active API keys.`);
+    err.status = 409;
+    throw err;
+  }
+
   const rawKey = generateApiKey();
   const key_hash = hashApiKey(rawKey);
   const key_prefix = getKeyPrefix(rawKey);

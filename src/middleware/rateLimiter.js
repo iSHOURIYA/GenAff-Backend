@@ -97,6 +97,19 @@ const resetPasswordRateLimiter = rateLimit({
 });
 
 /**
+ * Signup limiter – prevents rapid account farming from a single IP.
+ * Default: 2 accounts/hour/IP.
+ */
+const signupRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: parseInt(process.env.SIGNUP_RATE_LIMIT_PER_HOUR || '2', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Too many accounts created from this IP. Please try again later.' },
+});
+
+/**
  * Playground session creation limiter – controls temporary key creation.
  * 10 sessions per hour per authenticated user.
  */
@@ -118,5 +131,6 @@ module.exports = {
   otpRateLimiter,
   forgotPasswordRateLimiter,
   resetPasswordRateLimiter,
+  signupRateLimiter,
   playgroundSessionRateLimiter,
 };

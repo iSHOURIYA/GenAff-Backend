@@ -11,6 +11,29 @@ const {
   resetPasswordByOtp,
 } = require('../services/passwordResetService');
 
+const DEFAULT_DISPOSABLE_EMAIL_DOMAINS = [
+  '10minutemail.com',
+  'guerrillamail.com',
+  'mailinator.com',
+  'tempmail.com',
+  'temp-mail.org',
+  'yopmail.com',
+  'sharklasers.com',
+  'dispostable.com',
+  'maildrop.cc',
+  'getnada.com',
+];
+
+const EXTRA_DISPOSABLE_DOMAINS = (process.env.DISPOSABLE_EMAIL_DOMAINS || '')
+  .split(',')
+  .map((d) => d.trim().toLowerCase())
+  .filter(Boolean);
+
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  ...DEFAULT_DISPOSABLE_EMAIL_DOMAINS,
+  ...EXTRA_DISPOSABLE_DOMAINS,
+]);
+
 /**
  * POST /auth/register
  * Body: { email, password }
@@ -29,6 +52,12 @@ async function register(req, res) {
       return res.status(400).json({ error: 'Invalid email address' });
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+    const emailDomain = normalizedEmail.split('@')[1];
+    if (emailDomain && DISPOSABLE_EMAIL_DOMAINS.has(emailDomain)) {
+      return res.status(400).json({ error: 'Disposable email domains are not allowed' });
+    }
+
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
@@ -37,7 +66,7 @@ async function register(req, res) {
       return res.status(400).json({ error: 'Password must be 72 characters or fewer' });
     }
 
-    const user = await createUser(email.toLowerCase().trim(), password);
+    const user = await createUser(normalizedEmail, password);
 
     // Send hybrid OTP + magic-link verification email
     await createAndSendVerification(user.id, user.email);

@@ -6,6 +6,29 @@ const PLAYGROUND_MAX_ACTIVE_SESSIONS = parseInt(process.env.PLAYGROUND_MAX_ACTIV
 const PLAYGROUND_CLEANUP_INTERVAL_MS = parseInt(process.env.PLAYGROUND_CLEANUP_INTERVAL_MS || '300000', 10);
 
 async function createPlaygroundSession(userId, ttlMinutes = PLAYGROUND_SESSION_TTL_MINUTES, title) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email_verified: true, is_suspended: true },
+  });
+
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (!user.email_verified) {
+    const err = new Error('Email not verified. Please verify your email before using playground.');
+    err.status = 403;
+    throw err;
+  }
+
+  if (user.is_suspended) {
+    const err = new Error('Account suspended. Please contact support.');
+    err.status = 403;
+    throw err;
+  }
+
   const safeTtl = Math.max(5, Math.min(parseInt(ttlMinutes || PLAYGROUND_SESSION_TTL_MINUTES, 10), 240));
   const now = Date.now();
   const expiresAt = new Date(now + safeTtl * 60 * 1000);

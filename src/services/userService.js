@@ -1,6 +1,8 @@
 const prisma = require('./prismaClient');
 const { hashPassword, comparePassword } = require('../utils/hash');
 
+const FREE_UNITS_ON_VERIFY = parseInt(process.env.FREE_UNITS_ON_VERIFY || '10', 10);
+
 /**
  * Create a new user account with a wallet and free units.
  * @param {string} email
@@ -21,7 +23,8 @@ async function createUser(email, password) {
     data: {
       email,
       password_hash,
-      free_units: 10,
+      // Free units are granted only after successful email verification.
+      free_units: 0,
       wallet: {
         create: { balance_inr: 0 },
       },
@@ -56,6 +59,18 @@ async function authenticateUser(email, password) {
   if (!valid) {
     const err = new Error('Invalid email or password');
     err.status = 401;
+    throw err;
+  }
+
+  if (!user.email_verified) {
+    const err = new Error('Email not verified. Please verify your email before logging in.');
+    err.status = 403;
+    throw err;
+  }
+
+  if (user.is_suspended) {
+    const err = new Error('Account suspended. Please contact support.');
+    err.status = 403;
     throw err;
   }
 
@@ -116,4 +131,47 @@ async function updateUserPassword(userId, newPassword) {
   });
 }
 
-module.exports = { createUser, authenticateUser, getUserById, getUserByEmail, updateUserPassword };
+/**
+ * Mark user verified and grant one-time free units.
+ * If user already has free units, preserve the higher value.
+ * @param {string} userId
+ * @returns {Promise<object>}
+ */
+async function verifyUserAndGrantUnits(userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email_verified: true, free_units: true },
+  });
+
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (user.email_verified) {
+    const err = new Error('Email is already verified');
+    err.status = 409;
+    throw err;
+  }
+
+  const newFreeUnits = Math.max(user.free_units || 0, FREE_UNITS_ON_VERIFY);
+
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      email_verified: true,
+      free_units: newFreeUnits,
+    },
+    select: { id: true, email: true, created_at: true, free_units: true },
+  });
+}
+
+module.exports = {
+  createUser,
+  authenticateUser,
+  getUserById,
+  getUserByEmail,
+  updateUserPassword,
+  verifyUserAndGrantUnits,
+};

@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const prisma = require('./prismaClient');
 const { sendVerificationEmail } = require('./emailService');
 
+const FREE_UNITS_ON_VERIFY = parseInt(process.env.FREE_UNITS_ON_VERIFY || '10', 10);
+
 const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '15', 10);
 
 /**
@@ -56,12 +58,6 @@ async function verifyByOtp(email, otp) {
     throw err;
   }
 
-  if (user.email_verified) {
-    const err = new Error('Email is already verified');
-    err.status = 409;
-    throw err;
-  }
-
   const record = await prisma.pendingVerification.findFirst({
     where: { user_id: user.id, used: false },
     orderBy: { created_at: 'desc' },
@@ -85,11 +81,19 @@ async function verifyByOtp(email, otp) {
     throw err;
   }
 
-  // Atomically mark used + verify user
+  if (user.email_verified) {
+    const err = new Error('Email is already verified');
+    err.status = 409;
+    throw err;
+  }
+
+  const newFreeUnits = Math.max(user.free_units || 0, FREE_UNITS_ON_VERIFY);
+
+  // Atomically mark used + verify user + grant one-time units
   const [verifiedUser] = await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
-      data: { email_verified: true },
+      data: { email_verified: true, free_units: newFreeUnits },
       select: { id: true, email: true, created_at: true, free_units: true },
     }),
     prisma.pendingVerification.update({
@@ -137,11 +141,13 @@ async function verifyByToken(token) {
     throw err;
   }
 
-  // Atomically mark used + verify user
+  const newFreeUnits = Math.max(record.user.free_units || 0, FREE_UNITS_ON_VERIFY);
+
+  // Atomically mark used + verify user + grant one-time units
   const [verifiedUser] = await prisma.$transaction([
     prisma.user.update({
       where: { id: record.user_id },
-      data: { email_verified: true },
+      data: { email_verified: true, free_units: newFreeUnits },
       select: { id: true, email: true, created_at: true, free_units: true },
     }),
     prisma.pendingVerification.update({

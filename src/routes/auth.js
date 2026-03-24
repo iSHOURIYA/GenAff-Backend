@@ -16,10 +16,11 @@ const {
 	otpRateLimiter,
 	forgotPasswordRateLimiter,
 	resetPasswordRateLimiter,
+	signupRateLimiter,
 } = require('../middleware/rateLimiter');
 
 // POST /auth/register
-router.post('/register', register);
+router.post('/register', signupRateLimiter, register);
 
 // POST /auth/login  (rate-limited to prevent brute-force)
 router.post('/login', authRateLimiter, login);
