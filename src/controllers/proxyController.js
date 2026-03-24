@@ -6,6 +6,7 @@ const { calculateCostInr, detectProvider } = require('../utils/pricing');
 const { deductBalance } = require('../services/walletService');
 const { logUsage } = require('../services/usageService');
 const { storePlaygroundTurn } = require('../services/playgroundService');
+const { recordModelSuccess, recordModelFailure } = require('../services/modelHealthCheckService');
 const prisma = require('../services/prismaClient');
 
 const PROVIDER_HANDLERS = {
@@ -94,6 +95,8 @@ async function chatCompletions(req, res) {
         providerErr?.response?.data?.message ||
         providerErr.message;
 
+      recordModelFailure(model, detail);
+
       return res.status(502).json({
         error: 'Provider error',
         detail,
@@ -101,6 +104,9 @@ async function chatCompletions(req, res) {
     }
 
     const { data: responseData, tokensUsed } = providerResponse;
+
+    // Passive signal from real traffic: successful completions indicate health.
+    recordModelSuccess(model);
 
     // ── Calculate cost ────────────────────────────────────────────
     const costInr = calculateCostInr(model, tokensUsed);

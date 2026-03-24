@@ -10,7 +10,8 @@ const { getLiveModels, getHealthStatus } = require('../services/modelHealthCheck
  * Returns only healthy (live) models with INR pricing per 1,000 tokens.
  * No auth required. owned_by is always 'genaff' — source never disclosed.
  *
- * Models are health-checked every 5 minutes. Falls back to all models if checks fail.
+ * Models use low-cost health strategy (provider canaries + passive traffic signals).
+ * Falls back to all models if no healthy data is available.
  */
 router.get('/models', async (req, res) => {
   try {
@@ -58,7 +59,7 @@ router.get('/models/health', async (req, res) => {
     const summary = {
       healthy: Object.values(health).filter((h) => h.status === 'healthy').length,
       unhealthy: Object.values(health).filter((h) => h.status === 'unhealthy').length,
-      error: Object.values(health).filter((h) => h.status === 'error').length,
+      unknown: Object.values(health).filter((h) => h.status === 'unknown').length,
     };
 
     return res.json({
