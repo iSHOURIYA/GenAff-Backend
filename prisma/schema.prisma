@@ -30,6 +30,7 @@ model User {
   usages                Usage[]
   top_ups               TopUp[]
   pending_verifications PendingVerification[]
+  pending_password_resets PendingPasswordReset[]
   model_restrictions    UserModelRestriction[]
 
   @@map("users")
@@ -47,6 +48,21 @@ model PendingVerification {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("pending_verifications")
+}
+
+model PendingPasswordReset {
+  id         String   @id @default(uuid())
+  user_id    String
+  otp        String   // 6-digit code
+  token      String   @unique // uuid for magic link
+  expires_at DateTime
+  used       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("pending_password_resets")
 }
 
 model ApiKey {

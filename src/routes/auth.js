@@ -1,7 +1,22 @@
 const router = require('express').Router();
-const { register, login, me, verifyOtp, verifyEmail, resendVerification } = require('../controllers/authController');
+const {
+	register,
+	login,
+	me,
+	verifyOtp,
+	verifyEmail,
+	resendVerification,
+	forgotPassword,
+	resetPassword,
+} = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
-const { authRateLimiter, resendRateLimiter, otpRateLimiter } = require('../middleware/rateLimiter');
+const {
+	authRateLimiter,
+	resendRateLimiter,
+	otpRateLimiter,
+	forgotPasswordRateLimiter,
+	resetPasswordRateLimiter,
+} = require('../middleware/rateLimiter');
 
 // POST /auth/register
 router.post('/register', register);
@@ -20,5 +35,11 @@ router.get('/verify-email', verifyEmail);
 
 // POST /auth/resend-verification  (rate-limited to prevent email flooding)
 router.post('/resend-verification', resendRateLimiter, resendVerification);
+
+// POST /auth/forgot-password  (rate-limited to prevent reset email flooding)
+router.post('/forgot-password', forgotPasswordRateLimiter, forgotPassword);
+
+// POST /auth/reset-password  (rate-limited to throttle reset attempts)
+router.post('/reset-password', resetPasswordRateLimiter, resetPassword);
 
 module.exports = router;

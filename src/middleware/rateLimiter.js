@@ -72,4 +72,35 @@ const otpRateLimiter = rateLimit({
   message: { error: 'Too many verification attempts. Please wait 15 minutes or request a new code.' },
 });
 
-module.exports = { proxyRateLimiter, authRateLimiter, resendRateLimiter, otpRateLimiter };
+/**
+ * Forgot-password limiter – prevents reset-email flooding.
+ * 3 attempts per 10 minutes per IP.
+ */
+const forgotPasswordRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests. Please wait 10 minutes before trying again.' },
+});
+
+/**
+ * Reset-password limiter – throttles reset attempts.
+ * 5 attempts per 15 minutes per IP.
+ */
+const resetPasswordRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset attempts. Please wait 15 minutes before trying again.' },
+});
+
+module.exports = {
+  proxyRateLimiter,
+  authRateLimiter,
+  resendRateLimiter,
+  otpRateLimiter,
+  forgotPasswordRateLimiter,
+  resetPasswordRateLimiter,
+};

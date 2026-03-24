@@ -102,4 +102,18 @@ async function getUserByEmail(email) {
   });
 }
 
-module.exports = { createUser, authenticateUser, getUserById, getUserByEmail };
+/**
+ * Update a user's password hash.
+ * @param {string} userId
+ * @param {string} newPassword
+ * @returns {Promise<void>}
+ */
+async function updateUserPassword(userId, newPassword) {
+  const password_hash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password_hash },
+  });
+}
+
+module.exports = { createUser, authenticateUser, getUserById, getUserByEmail, updateUserPassword };

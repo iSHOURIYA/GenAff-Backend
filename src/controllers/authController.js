@@ -5,6 +5,11 @@ const {
   verifyByOtp,
   verifyByToken,
 } = require('../services/verificationService');
+const {
+  createAndSendPasswordReset,
+  resetPasswordByToken,
+  resetPasswordByOtp,
+} = require('../services/passwordResetService');
 
 /**
  * POST /auth/register
@@ -200,4 +205,96 @@ async function resendVerification(req, res) {
   }
 }
 
-module.exports = { register, login, me, verifyOtp, verifyEmail, resendVerification };
+/**
+ * POST /auth/forgot-password
+ * Body: { email }
+ * Returns a generic 200 response regardless of whether the user exists.
+ */
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'email is required' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const user = await getUserByEmail(normalizedEmail);
+
+    // Generic response to prevent user enumeration
+    if (!user) {
+      return res.status(200).json({
+        message: 'If that email exists, password reset instructions have been sent.',
+      });
+    }
+
+    await createAndSendPasswordReset(user.id, user.email);
+
+    return res.status(200).json({
+      message: 'If that email exists, password reset instructions have been sent.',
+    });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    console.error('[authController.forgotPassword]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * POST /auth/reset-password
+ * Body (magic link): { token, new_password }
+ * Body (OTP):        { email, otp, new_password }
+ */
+async function resetPassword(req, res) {
+  try {
+    const { token, email, otp, new_password } = req.body;
+
+    if (!new_password) {
+      return res.status(400).json({ error: 'new_password is required' });
+    }
+
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    if (new_password.length > 72) {
+      return res.status(400).json({ error: 'Password must be 72 characters or fewer' });
+    }
+
+    if (token) {
+      await resetPasswordByToken(String(token).trim(), new_password);
+      return res.status(200).json({ message: 'Password reset successful. Please login with your new password.' });
+    }
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Provide either { token, new_password } or { email, otp, new_password }' });
+    }
+
+    await resetPasswordByOtp(email.toLowerCase().trim(), String(otp).trim(), new_password);
+    return res.status(200).json({ message: 'Password reset successful. Please login with your new password.' });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    console.error('[authController.resetPassword]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+module.exports = {
+  register,
+  login,
+  me,
+  verifyOtp,
+  verifyEmail,
+  resendVerification,
+  forgotPassword,
+  resetPassword,
+};
