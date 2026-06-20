@@ -81,7 +81,7 @@ backend/
 ### Base URL
 
 - **Local:**  `http://localhost:3000`
-- **Production:** `https://genaff-api.shauryacodes.xyz`
+- **Production:** `https://<YOUR_API_DOMAIN>`  (set by `API_DOMAIN` in `.env`)
 
 ---
 
@@ -380,7 +380,7 @@ pm2 stop genaff-backend       # stop
 
 ## Connecting Your Domain
 
-### Domain: `genaff-api.shauryacodes.xyz`
+### Domain: `<YOUR_API_DOMAIN>`
 
 ### 1 – DNS Setup
 
@@ -388,7 +388,7 @@ Add an **A record** in your DNS provider:
 
 | Type | Name                        | Value          | TTL  |
 |------|-----------------------------|----------------|------|
-| A    | `genaff-api.shauryacodes.xyz` | `YOUR_VPS_IP`  | Auto |
+| A    | `<YOUR_API_DOMAIN>` | `YOUR_VPS_IP`  | Auto |
 
 ### 2 – Install Nginx
 
@@ -408,7 +408,7 @@ Paste:
 ```nginx
 server {
     listen 80;
-    server_name genaff-api.shauryacodes.xyz;
+    server_name YOUR_API_DOMAIN;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -438,12 +438,12 @@ sudo systemctl reload nginx
 
 ```bash
 sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d genaff-api.shauryacodes.xyz
+sudo certbot --nginx -d YOUR_API_DOMAIN
 ```
 
 Follow prompts. Certbot auto-renews every 90 days.
 
-Your API is now live at `https://genaff-api.shauryacodes.xyz`.
+Your API is now live at `https://<YOUR_API_DOMAIN>`.
 
 ---
 
@@ -489,27 +489,27 @@ New users receive **10 free units** (each unit covers one request regardless of 
 
 ```bash
 # 1. Register
-curl -X POST https://genaff-api.shauryacodes.xyz/auth/register \
+curl -X POST https://<YOUR_API_DOMAIN>/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
 
 # 2. Login
-curl -X POST https://genaff-api.shauryacodes.xyz/auth/login \
+curl -X POST https://<YOUR_API_DOMAIN>/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
 
 # 3. Top up wallet (use JWT from login)
-curl -X POST https://genaff-api.shauryacodes.xyz/wallet/topup \
+curl -X POST https://<YOUR_API_DOMAIN>/wallet/topup \
   -H "Authorization: Bearer <JWT>" \
   -H "Content-Type: application/json" \
   -d '{"amount":50}'
 
 # 4. Create API key
-curl -X POST https://genaff-api.shauryacodes.xyz/keys \
+curl -X POST https://<YOUR_API_DOMAIN>/keys \
   -H "Authorization: Bearer <JWT>"
 
 # 5. Use AI proxy (use sk_genaff_... key from step 4)
-curl -X POST https://genaff-api.shauryacodes.xyz/v1/chat/completions \
+curl -X POST https://<YOUR_API_DOMAIN>/v1/chat/completions \
   -H "Authorization: Bearer sk_genaff_<your-key>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -517,6 +517,56 @@ curl -X POST https://genaff-api.shauryacodes.xyz/v1/chat/completions \
     "messages": [{"role":"user","content":"Say hello"}]
   }'
 ```
+
+---
+
+## Domain Migration Guide
+
+If you ever lose your domain (e.g., expiry, suspension), migrating to a new one is a **4-line change**.
+
+### Step 1 – Update `.env`
+
+Only these 4 lines need to change:
+
+```bash
+FRONTEND_URL=https://genaff.yourdomain.com
+API_DOMAIN=genaff-api.yourdomain.com
+SUPPORT_EMAIL=support@genaff.yourdomain.com
+FROM_EMAIL=noreply@genaff.yourdomain.com
+```
+
+### Step 2 – Update DNS
+
+Add an A record pointing `genaff-api.yourdomain.com` to your VPS IP.
+
+### Step 3 – Run Deploy Script
+
+```bash
+./deploy.sh
+```
+
+This script automatically:
+- Validates your `.env`
+- Generates the correct Nginx config
+- Obtains a new SSL certificate via Certbot
+- Restarts PM2
+
+**That's it. No code changes, no grepping.**
+
+---
+
+## Deploy Script (`deploy.sh`)
+
+The included `./deploy.sh` automates the full server setup:
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+It handles: Node.js, PostgreSQL, Nginx, PM2, Prisma migrate, SSL, and startup.
+
+Run it again after any `.env` change to reconfigure Nginx + SSL.
 
 ---
 

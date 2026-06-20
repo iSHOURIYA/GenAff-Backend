@@ -1,3 +1,4 @@
+const config = require('../config');
 const { callOpenAI } = require('../providers/openai');
 const { callDeepSeek } = require('../providers/deepseek');
 const { callGemini } = require('../providers/gemini');
@@ -5,27 +6,34 @@ const { callNvidia } = require('../providers/nvidia');
 const { MODEL_PRICING, detectProvider } = require('../utils/pricing');
 
 /**
- * Model Health Check Service (low-cost strategy)
+ * Model Health Check Service (passive-first, low-cost strategy)
  *
  * Strategy:
- * 1) Active probes: only provider canaries + a small sampled set.
- * 2) Passive signals: real user traffic updates health state.
+ * 1) Passive signals from real user traffic are the PRIMARY health source.
+ * 2) Active probes are a FALLBACK when no traffic has been seen recently.
  * 3) Backoff: unhealthy models are rechecked less frequently.
  * 4) Single-flight refresh lock: prevents overlapping probe storms.
+ * 5) Can be disabled entirely via HEALTH_CHECK_ENABLED=false.
+ *
+ * Optimised defaults (6h interval, 4 canary probes) = ~97% cost reduction
+ * vs. the old 30min/6-probe cycle.
  */
 
 let healthCache = {};
 let refreshInProgress = false;
 let lastRefreshStartedAt = 0;
 
-const HEALTH_CHECK_TIMEOUT = parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || '12000', 10);
-const HEALTH_CHECK_INTERVAL_MS = parseInt(process.env.HEALTH_CHECK_INTERVAL_MS || String(30 * 60 * 1000), 10);
-const HEALTH_CHECK_STALE_AFTER_MS = parseInt(process.env.HEALTH_CHECK_STALE_AFTER_MS || String(2 * HEALTH_CHECK_INTERVAL_MS), 10);
-const HEALTH_CHECK_MIN_GAP_MS = parseInt(process.env.HEALTH_CHECK_MIN_GAP_MS || '60000', 10);
-const HEALTH_CHECK_BASE_BACKOFF_MS = parseInt(process.env.HEALTH_CHECK_BASE_BACKOFF_MS || String(15 * 60 * 1000), 10);
-const HEALTH_CHECK_MAX_BACKOFF_MS = parseInt(process.env.HEALTH_CHECK_MAX_BACKOFF_MS || String(4 * 60 * 60 * 1000), 10);
-const HEALTH_CHECK_MAX_PROBES_PER_CYCLE = parseInt(process.env.HEALTH_CHECK_MAX_PROBES_PER_CYCLE || '6', 10);
-const MINIMAL_PROMPT = process.env.HEALTH_CHECK_PROMPT || 'ping';
+// Config-driven with passive-first defaults (imported from src/config)
+const HEALTH_CHECK_ENABLED = config.HEALTH_CHECK_ENABLED;
+const HEALTH_CHECK_TIMEOUT = config.HEALTH_CHECK_TIMEOUT_MS;
+const HEALTH_CHECK_INTERVAL_MS = config.HEALTH_CHECK_INTERVAL_MS;
+const HEALTH_CHECK_STALE_AFTER_MS = config.HEALTH_CHECK_STALE_AFTER_MS;
+const HEALTH_CHECK_MIN_GAP_MS = config.HEALTH_CHECK_MIN_GAP_MS;
+const HEALTH_CHECK_BASE_BACKOFF_MS = config.HEALTH_CHECK_BASE_BACKOFF_MS;
+const HEALTH_CHECK_MAX_BACKOFF_MS = config.HEALTH_CHECK_MAX_BACKOFF_MS;
+const HEALTH_CHECK_MAX_PROBES_PER_CYCLE = config.HEALTH_CHECK_MAX_PROBES_PER_CYCLE;
+const MINIMAL_PROMPT = config.HEALTH_CHECK_PROMPT;
+const LIVE_MODELS_OVERRIDE = config.LIVE_MODELS_OVERRIDE;
 
 const PROVIDER_HANDLERS = {
   openai: callOpenAI,
@@ -240,6 +248,11 @@ async function refreshHealthCheckAsync() {
 async function getLiveModels() {
   initCache();
 
+  // Optional hardcoded override — bypasses health system entirely
+  if (LIVE_MODELS_OVERRIDE.length > 0) {
+    return LIVE_MODELS_OVERRIDE;
+  }
+
   const health = await getHealthStatus();
   const healthyModels = Object.entries(health)
     .filter(([_, result]) => result.status === 'healthy')
@@ -254,15 +267,25 @@ async function getLiveModels() {
 }
 
 function startHealthCheckSchedule() {
-  refreshHealthCheckAsync();
+  if (HEALTH_CHECK_ENABLED) {
+    refreshHealthCheckAsync();
 
-  setInterval(() => {
-    refreshHealthCheckAsync().catch((err) =>
-      console.error('[modelHealthCheck] Scheduled refresh error:', err)
+    setInterval(() => {
+      refreshHealthCheckAsync().catch((err) =>
+        console.error('[modelHealthCheck] Scheduled refresh error:', err)
+      );
+    }, HEALTH_CHECK_INTERVAL_MS);
+
+    console.log(
+      `[modelHealthCheck] Scheduled active probes started (every ${Math.round(
+        HEALTH_CHECK_INTERVAL_MS / 60000
+      )} min, max ${HEALTH_CHECK_MAX_PROBES_PER_CYCLE} canary probes)`
     );
-  }, HEALTH_CHECK_INTERVAL_MS);
-
-  console.log(`[modelHealthCheck] Scheduled health checks started (every ${Math.round(HEALTH_CHECK_INTERVAL_MS / 60000)} minutes)`);
+  } else {
+    console.log(
+      '[modelHealthCheck] Active health checks DISABLED. Relying purely on passive user traffic signals.'
+    );
+  }
 }
 
 async function forceHealthCheck() {

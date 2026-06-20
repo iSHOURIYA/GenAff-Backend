@@ -12,7 +12,7 @@
 | Environment | Base URL | Source |
 |---|---|---|
 | Local development | `http://localhost:3000` | `src/server.js` default `PORT=3000` |
-| Production (documented) | `https://genaff-api.shauryacodes.xyz` | `README.md`, `test.sh` |
+| Production (documented) | `https://genaff-api.shouriya.tech` | `README.md`, `test.sh` |
 | Staging | Not defined in code/docs | — |
 
 ## API Surface Prefixes
@@ -1614,7 +1614,7 @@ Gemini adapter converts OpenAI-style messages to Gemini `contents`, then normali
 ```ts
 import axios from 'axios';
 
-const api = axios.create({ baseURL: 'https://genaff-api.shauryacodes.xyz' });
+const api = axios.create({ baseURL: 'https://genaff-api.shouriya.tech' });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('jwt');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -1627,7 +1627,7 @@ const { data } = await api.get('/wallet');
 ### API-key request (fetch)
 ```ts
 const apiKey = '<sk_genaff_...>';
-const res = await fetch('https://genaff-api.shauryacodes.xyz/v1/chat/completions', {
+const res = await fetch('https://genaff-api.shouriya.tech/v1/chat/completions', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

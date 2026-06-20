@@ -1,11 +1,12 @@
 const PDFDocument = require('pdfkit');
 const prisma = require('./prismaClient');
+const config = require('../config');
 
 const BRAND = {
-  name: process.env.BILLING_COMPANY_NAME || 'GenAff',
-  website: process.env.BILLING_COMPANY_WEBSITE || 'https://genaff.shauryacodes.xyz',
-  supportEmail: process.env.BILLING_SUPPORT_EMAIL || 'support@genaff.shauryacodes.xyz',
-  signatory: process.env.BILLING_SIGNATORY_NAME || 'Ishouriya',
+  name: config.BILLING_COMPANY_NAME,
+  website: config.BILLING_COMPANY_WEBSITE,
+  supportEmail: config.BILLING_SUPPORT_EMAIL,
+  signatory: config.BILLING_SIGNATORY_NAME,
 };
 
 const THEME = {

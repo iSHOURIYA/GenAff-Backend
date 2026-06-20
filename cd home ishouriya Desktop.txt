@@ -1,32 +1,36 @@
 cd /home/ishouriya/Desktop/GenAff-Backend
 
-cat > .gitignore << 'EOF'
-node_modules/
-.env
-*.log
-EOF
+# === DEPLOYMENT (run this on your VPS) ===
+# Make sure .env is filled in with your live values, then:
+chmod +x deploy.sh
+./deploy.sh
 
-git add .
-git commit -m "feat: production-ready GenAff backend"
-git push origin main
+# === For future code updates ===
+cd /home/ishouriya/Desktop/GenAff-Backend
+git pull origin main
+npm install
+pm2 restart genaff-backend
 
+# === LEGACY MANUAL STEPS (use deploy.sh instead) ===
+# Manual steps are kept below for reference only.
+# The deploy.sh script automates everything.
 
-# Install Node.js 20
+# 1. Install Node.js 20
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# Install PostgreSQL
+# 2. Install PostgreSQL
 sudo apt install postgresql postgresql-contrib -y
 
-# Install PM2 + Nginx
+# 3. Install PM2 + Nginx
 sudo npm install -g pm2
 sudo apt install nginx -y
 
-# Create DB
+# 4. Create DB
 sudo -u postgres psql -c "CREATE USER genaff_user WITH PASSWORD 'your_strong_password';"
 sudo -u postgres psql -c "CREATE DATABASE genaff OWNER genaff_user;"
 
-
+# 5. Clone and setup
 git clone https://github.com/yourusername/genaff-backend.git
 cd genaff-backend
 npm install
@@ -37,11 +41,11 @@ npm run db:migrate   # prisma migrate deploy
 pm2 start src/server.js --name genaff-backend
 pm2 save && pm2 startup
 
-sudo nano /etc/nginx/sites-available/genaff-api
-
+# 6. Nginx config
+cat | sudo tee /etc/nginx/sites-available/genaff-api <<'EOF'
 server {
     listen 80;
-    server_name genaff-api.shauryacodes.xyz;
+    server_name YOUR_API_DOMAIN_HERE;  # e.g., genaff-api.shouriya.tech
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
@@ -50,12 +54,11 @@ server {
         proxy_read_timeout 120s;
     }
 }
-
+EOF
 sudo ln -s /etc/nginx/sites-available/genaff-api /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
+
+# 7. SSL
 sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d genaff-api.shauryacodes.xyz
+sudo certbot --nginx -d YOUR_API_DOMAIN_HERE
 
-
-for futerre updates 
-cd genaff-backend && git pull origin main && npm install && pm2 restart genaff-backend

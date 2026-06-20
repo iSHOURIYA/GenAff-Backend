@@ -7,6 +7,8 @@
 
 require('dotenv').config();
 
+const config = require('./config');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -37,7 +39,7 @@ app.use(helmet({
 
 // ── CORS ──────────────────────────────────────────────────────────────
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'https://genaff.shauryacodes.xyz',
+  config.FRONTEND_URL,
   'http://localhost:3000',
   'http://localhost:5173', // Vite dev server
 ];

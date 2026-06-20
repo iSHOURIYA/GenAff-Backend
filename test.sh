@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────
 # GenAff API – Complete Test Suite
-# Usage: bash test.sh
+# Usage: bash test.sh [https://your-api-domain.com]
+#   If argument omitted, reads API_URL from .env
 # ─────────────────────────────────────────────────────────────────
 
-BASE="https://genaff-api.shauryacodes.xyz"
+# Read API_URL from .env if exists
+if [ -f .env ]; then
+  ENV_API_URL=$(grep '^API_URL=' .env | cut -d= -f2 | tr -d ' "')
+fi
+
+BASE="${1:-${ENV_API_URL:-https://genaff-api.shouriya.tech}}"
 PASS=0
 FAIL=0
 

@@ -57,11 +57,6 @@ const MODEL_PRICING = {
   'deepseek-reasoner':  0.00605,
   // provider: deepseek-coder $0.0014 blended + 10%
   'deepseek-coder':     0.00154,
-  // MAAS variants (Vertex AI hosted – requires Google Cloud auth,
-  // NOT the standard DEEPSEEK_API_KEY. Priced same as direct for billing.)
-  'deepseek-r1-0528-maas':  0.00605,
-  'deepseek-v3.2-maas':     0.000416,
-  'deepseek-v3.1-maas':     0.00154,
 
   // ── Gemini 2.5+ only (older models removed – no longer relevant) ───────
   // provider: gemini-3.1-pro-preview $2.00 in / $12.00 out per 1M → blended $0.009 + 10%

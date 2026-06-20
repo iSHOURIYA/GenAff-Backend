@@ -7,10 +7,9 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
  * NOTE on MAAS models (deepseek-r1-0528-maas, deepseek-v3.2-maas, etc.):
  * These are hosted on Google Vertex AI and require Google Cloud service-account
  * auth — they CANNOT be called with a plain DEEPSEEK_API_KEY.
+ * MAAS models have been removed from the pricing map to prevent confusion.
  * If you want Vertex AI MAAS support, add a separate provider file.
- * For now, calling a *-maas model will return a 502 with a clear error.
  */
-const MAAS_MODELS = ['deepseek-r1-0528-maas', 'deepseek-v3.2-maas', 'deepseek-v3.1-maas'];
 
 /**
  * Forward a chat-completion request to DeepSeek.
@@ -23,15 +22,6 @@ const MAAS_MODELS = ['deepseek-r1-0528-maas', 'deepseek-v3.2-maas', 'deepseek-v3
  * @returns {Promise<{data: object, tokensUsed: number}>}
  */
 async function callDeepSeek({ model, messages, max_tokens, temperature }) {
-  if (MAAS_MODELS.includes(model)) {
-    const err = new Error(
-      `Model "${model}" is a Vertex AI MAAS model and requires Google Cloud credentials, ` +
-      'not a DeepSeek API key. Use "deepseek-chat" or "deepseek-reasoner" for the direct API.'
-    );
-    err.status = 400;
-    throw err;
-  }
-
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error('DEEPSEEK_API_KEY is not configured');
 
