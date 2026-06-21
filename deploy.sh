@@ -98,10 +98,57 @@ npm run db:migrate
 # ── Generate Nginx config ──────────────────────────────────────
 NGINX_CONF="/etc/nginx/sites-available/genaff-api"
 NGINX_ENABLED="/etc/nginx/sites-enabled/genaff-api"
+CERT_PATH="/etc/letsencrypt/live/$API_DOMAIN/fullchain.pem"
+KEY_PATH="/etc/letsencrypt/live/$API_DOMAIN/privkey.pem"
+
+# Check if SSL certificates already exist
+SSL_AVAILABLE=false
+if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
+  SSL_AVAILABLE=true
+fi
 
 echo "▶ Configuring Nginx for $API_DOMAIN..."
+echo "  SSL certs: $([ "$SSL_AVAILABLE" = true ] && echo 'FOUND' || echo 'NOT FOUND')"
 
-sudo tee "$NGINX_CONF" > /dev/null <<EOF
+if [ "$SSL_AVAILABLE" = true ]; then
+  # Full HTTPS config: redirect 80→443 + SSL proxy
+  sudo tee "$NGINX_CONF" > /dev/null <<EOF
+server {
+    listen 80;
+    server_name $API_DOMAIN;
+    location / { return 301 https://\$host\$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    server_name $API_DOMAIN;
+
+    ssl_certificate $CERT_PATH;
+    ssl_certificate_key $KEY_PATH;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:${PORT:-3000};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+}
+EOF
+
+  echo "  Nginx config (HTTPS): redirect 80→443 + SSL proxy"
+
+else
+  # Fallback: port 80 only (until Certbot creates certs)
+  sudo tee "$NGINX_CONF" > /dev/null <<EOF
 server {
     listen 80;
     server_name $API_DOMAIN;
@@ -122,6 +169,9 @@ server {
 }
 EOF
 
+  echo "  Nginx config (HTTP): port 80 only — HTTPS will be added by Certbot"
+fi
+
 # Enable site
 if [ ! -L "$NGINX_ENABLED" ]; then
   sudo ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
@@ -132,28 +182,66 @@ if [ -L /etc/nginx/sites-enabled/default ]; then
   sudo rm /etc/nginx/sites-enabled/default
 fi
 
-sudo nginx -t
-sudo systemctl reload nginx
+sudo nginx -t && sudo systemctl reload nginx
 
 # ── SSL with Certbot ───────────────────────────────────────────
-echo "▶ Obtaining SSL certificate for $API_DOMAIN..."
+echo "▶ Setting up SSL for $API_DOMAIN..."
 
 if ! command -v certbot &>/dev/null; then
   echo "  Installing Certbot..."
   sudo apt install -y certbot python3-certbot-nginx
 fi
 
-# Check if cert already exists
-if sudo certbot certificates 2>/dev/null | grep -q "$API_DOMAIN"; then
-  echo "  SSL certificate already exists for $API_DOMAIN. Renewing if needed..."
-  sudo certbot renew --nginx --quiet || true
-else
-  # Non-interactive certbot
+if [ ! -f "$CERT_PATH" ] || [ ! -f "$KEY_PATH" ]; then
+  # Certificates missing — try to obtain them
+  echo "  Requesting certificate from Certbot..."
   sudo certbot --nginx -d "$API_DOMAIN" --non-interactive --agree-tos \
-    --email "${SUPPORT_EMAIL:-admin@$API_DOMAIN}" || {
-    echo "⚠️  Certbot failed. You can re-run manually:"
-    echo "   sudo certbot --nginx -d $API_DOMAIN"
-  }
+    --email "${SUPPORT_EMAIL:-admin@$API_DOMAIN}"
+
+  # After Certbot, re-check and regenerate full HTTPS config
+  if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
+    echo "  Certificate obtained. Regenerating Nginx config with HTTPS..."
+    sudo tee "$NGINX_CONF" > /dev/null <<EOF
+server {
+    listen 80;
+    server_name $API_DOMAIN;
+    location / { return 301 https://\$host\$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    server_name $API_DOMAIN;
+
+    ssl_certificate $CERT_PATH;
+    ssl_certificate_key $KEY_PATH;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:${PORT:-3000};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+}
+EOF
+    sudo nginx -t && sudo systemctl reload nginx
+    echo "  HTTPS enabled successfully."
+  else
+    echo "⚠️  Certbot could not obtain certificate. Your server runs on HTTP only."
+    echo "   Retry manually: sudo certbot --nginx -d $API_DOMAIN"
+  fi
+else
+  # Certs already exist — just ensure they're not expired
+  echo "  SSL certificates already exist. Ensuring auto-renewal..."
+  sudo certbot renew --nginx --quiet 2>/dev/null || true
 fi
 
 # ── Start / Restart PM2 ────────────────────────────────────────
