@@ -50,6 +50,13 @@ async function chatCompletions(req, res) {
       return res.status(400).json({ error: '"messages" array is required' });
     }
 
+    // Check if model is known in our pricing catalog
+    if (!MODEL_PRICING[model]) {
+      return res.status(400).json({
+        error: `Unknown model: "${model}". Check /v1/models for available models.`,
+      });
+    }
+
     const restrictedModels = (user.model_restrictions || []).map((item) => item.model);
     if (restrictedModels.includes(model.toLowerCase())) {
       return res.status(403).json({

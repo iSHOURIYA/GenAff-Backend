@@ -2,44 +2,35 @@ const router = require('express').Router();
 const { chatCompletions } = require('../controllers/proxyController');
 const apiKeyMiddleware = require('../middleware/apiKeyMiddleware');
 const { proxyRateLimiter } = require('../middleware/rateLimiter');
-const { getModelCatalog } = require('../utils/pricing');
-const { getLiveModels, getHealthStatus } = require('../services/modelHealthCheckService');
+const { getLiveModelCatalog, refreshLiveModels } = require('../services/providerModelService');
+const { getHealthStatus } = require('../services/modelHealthCheckService');
 
 /**
  * GET /v1/models
- * Returns only healthy (live) models with INR pricing per 1,000 tokens.
- * No auth required. owned_by is always 'genaff' — source never disclosed.
+ * Returns dynamically discovered live models from all providers,
+ * intersected with our pricing catalog.
  *
- * Models use low-cost health strategy (provider canaries + passive traffic signals).
- * Falls back to all models if no healthy data is available.
+ * No auth required. owned_by is always 'genaff'.
  */
 router.get('/models', async (req, res) => {
   try {
-    const liveModels = await getLiveModels();
-    const catalog = getModelCatalog().filter((model) => liveModels.includes(model.id));
+    const catalog = await getLiveModelCatalog();
 
     return res.json({
       object: 'list',
       data: catalog,
       _meta: {
-        total_configured: getModelCatalog().length,
-        live_count: catalog.length,
+        total_live: catalog.length,
       },
     });
   } catch (err) {
     console.error('[proxy.models] Error fetching live models:', err);
-    // Fallback to all models if health check fails
-    return res.json({ object: 'list', data: getModelCatalog() });
+    return res.status(500).json({ error: 'Failed to fetch model catalog' });
   }
 });
 
 /**
  * POST /v1/chat/completions
- *
- * Middleware stack (in order):
- *   1. proxyRateLimiter  – 20 req/min per API key (429 if exceeded)
- *   2. apiKeyMiddleware  – validate sk_genaff_... key, attach user
- *   3. chatCompletions   – forward to AI provider, log usage, deduct balance
  */
 router.post(
   '/chat/completions',
@@ -49,9 +40,8 @@ router.post(
 );
 
 /**
- * GET /v1/models/health (admin/testing endpoint)
- * Returns detailed health status of all models.
- * Useful for debugging provider issues.
+ * GET /v1/models/health
+ * Admin/testing endpoint. Returns passive health check cache.
  */
 router.get('/models/health', async (req, res) => {
   try {

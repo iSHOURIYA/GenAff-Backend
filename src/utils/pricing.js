@@ -27,12 +27,6 @@ const USD_TO_INR = 86; // 1 USD = ₹86 (updated March 2026)
  */
 const MODEL_PRICING = {
   // ── OpenAI ────────────────────────────────────────────────────────────
-  // provider: gpt-5.1 $2.50 in / $15.00 out per 1M → blended $0.01125 + 10%
-  'gpt-5.1':        0.01238,
-  // provider: gpt-5.4 $0.08 blended (existing) + 10%
-  'gpt-5.4':        0.08800,
-  // provider: gpt-5 $0.05 blended (existing) + 10%
-  'gpt-5':          0.05500,
   // provider: gpt-4o $0.006 blended + 10%
   'gpt-4o':         0.00660,
   // provider: gpt-4o-mini $0.0003 blended + 10%
@@ -59,26 +53,13 @@ const MODEL_PRICING = {
   'deepseek-coder':     0.00154,
 
   // ── Gemini 2.5+ only (older models removed – no longer relevant) ───────
-  // provider: gemini-3.1-pro-preview $2.00 in / $12.00 out per 1M → blended $0.009 + 10%
-  'gemini-3.1-pro-preview': 0.00990,
   // provider: gemini-2.5-pro $0.00175 blended + 10%
   'gemini-2.5-pro':         0.001925,
-  'gemini-2.5-pro-exp':     0.001925,
   // provider: gemini-2.5-flash $0.0001 blended + 10%
   'gemini-2.5-flash':       0.000110,
-  'gemini-2.5-flash-exp':   0.000110,
 
   // ── Open-weight models via cloud inference ────────────────────────────
   // Priced competitively below OpenAI equivalents (100% margin on our end).
-  //
-  // Mid tier
-  'qwen-coder-32b':      0.00070,  // top open-source code model
-  'qwq-32b':             0.00080,  // reasoning model, R1-class quality
-  'llama-3.3-70b':       0.00100,  // best open 70B chat model
-  // Premium tier
-  'llama-3.1-405b':      0.00200,  // Llama 3.1 flagship 405B
-  'kimi-k2':             0.00250,  // Moonshot K2 large MoE
-  'llama-4-maverick':    0.00300,  // latest Meta flagship (vision + text)
 };
 
 /**
